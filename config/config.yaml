@@ -1,0 +1,62 @@
+data:
+  raw_path: "data/raw/m5_walmart"
+  processed_path: "data/processed"
+  test_size: 0.2
+  validation_size: 0.15
+
+features:
+  input_features:
+    - item_id
+    - store_id
+    - week
+    - sales
+    - cost
+    - inventory
+    - has_promo
+    - seasonality_index
+    - elasticity
+    - competitor_price
+  target: "price"
+  categorical_features:
+    - item_id
+    - store_id
+  numerical_features:
+    - sales
+    - cost
+    - inventory
+    - seasonality_index
+    - elasticity
+    - competitor_price
+
+model:
+  type: "xgboost"
+  params:
+    n_estimators: 300
+    max_depth: 8
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+
+explainability:
+  shap_background_samples: 100
+  lime_num_features: 8
+
+llm:
+  provider: "openai"  # or "mock" for testing without API key
+  model: "gpt-3.5-turbo"
+  max_tokens: 300
+  temperature: 0.3
+
+confidence:
+  uncertainty_threshold: 0.15
+
+business_rules:
+  min_price: 0.5
+  max_price: 100
+  max_price_increase_pct: 0.20
+  max_price_decrease_pct: 0.15
+
+experiment_tracking:
+  log_dir: "experiments/logs"
+  save_model: true

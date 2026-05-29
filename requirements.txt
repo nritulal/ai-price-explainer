@@ -1,0 +1,15 @@
+# No version pins - let pip find compatible versions
+numpy
+pandas
+scikit-learn
+xgboost
+shap
+lime
+matplotlib
+seaborn
+pyyaml
+joblib
+flask
+flask-cors
+tqdm
+python-dotenv

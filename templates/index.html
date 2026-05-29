@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI-Powered Price Explanations</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f0f2f5; }
+        .container { max-width: 1400px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; margin-bottom: 10px; }
+        .subtitle { color: #7f8c8d; margin-bottom: 30px; }
+        .two-columns { display: flex; gap: 30px; flex-wrap: wrap; }
+        .input-panel { flex: 1; min-width: 300px; }
+        .result-panel { flex: 1; min-width: 450px; }
+        .input-group { margin-bottom: 15px; display: flex; align-items: center; flex-wrap: wrap; }
+        label { width: 180px; font-weight: 600; color: #34495e; }
+        input { flex: 1; min-width: 150px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        input:focus { outline: none; border-color: #3498db; }
+        .checkbox-group { display: flex; align-items: center; }
+        .checkbox-group label { width: auto; margin-right: 15px; }
+        button { background: #3498db; color: white; padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; margin-top: 10px; width: 100%; }
+        button:hover { background: #2980b9; }
+        .price-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 12px; margin-bottom: 20px; text-align: center; }
+        .price { font-size: 48px; font-weight: bold; margin: 10px 0; }
+        .price-label { font-size: 14px; opacity: 0.9; }
+        .confidence { font-size: 14px; margin-top: 10px; }
+        .prediction-interval { font-size: 12px; margin-top: 5px; opacity: 0.8; }
+        .explanation-box { background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #3498db; white-space: pre-wrap; font-family: monospace; font-size: 14px; }
+        .factors { margin-top: 20px; }
+        .factor { padding: 12px; margin: 8px 0; background: white; border-radius: 8px; border-left: 4px solid #3498db; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .factor-name { font-weight: 600; color: #2c3e50; }
+        .factor-value { color: #7f8c8d; }
+        .factor-impact { font-weight: 600; }
+        .impact-positive { color: #27ae60; }
+        .impact-negative { color: #e74c3c; }
+        .rules-applied { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-top: 15px; font-size: 13px; }
+        .warnings-box { background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #ffc107; font-size: 13px; }
+        .recommendations-box { background: #d4edda; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #28a745; font-size: 13px; }
+        .loading { display: none; text-align: center; padding: 20px; }
+        .error { background: #fee; color: #c0392b; padding: 15px; border-radius: 8px; margin-top: 15px; }
+        hr { margin: 20px 0; border: none; border-top: 1px solid #e0e0e0; }
+        .confidence-high { color: #27ae60; }
+        .confidence-medium { color: #f39c12; }
+        .confidence-low { color: #e74c3c; }
+        @media (max-width: 768px) {
+            .input-group { flex-direction: column; align-items: flex-start; }
+            label { width: auto; margin-bottom: 5px; }
+            input { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI-Powered Price Explanations</h1>
+        <div class="subtitle">Transparent price recommendations with clear business explanations</div>
+
+        <div class="two-columns">
+            <div class="input-panel">
+                <form id="priceForm">
+                    <div class="input-group">
+                        <label>Sales (units):</label>
+                        <input type="number" id="sales" value="1000" step="100">
+                    </div>
+                    <div class="input-group">
+                        <label>Cost ($):</label>
+                        <input type="number" id="cost" value="5.00" step="0.5">
+                    </div>
+                    <div class="input-group">
+                        <label>Inventory (units):</label>
+                        <input type="number" id="inventory" value="5000" step="500">
+                    </div>
+                    <div class="input-group checkbox-group">
+                        <label>Has Promotion:</label>
+                        <input type="checkbox" id="has_promo" value="1">
+                    </div>
+                    <div class="input-group">
+                        <label>Seasonality Index:</label>
+                        <input type="number" id="seasonality_index" value="1.2" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Price Elasticity:</label>
+                        <input type="number" id="elasticity" value="-1.2" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Competitor Price ($):</label>
+                        <input type="number" id="competitor_price" value="8.50" step="0.5">
+                    </div>
+                    <div class="input-group">
+                        <label>Item Encoded (0-100):</label>
+                        <input type="number" id="item_encoded" value="10" step="1">
+                    </div>
+                    <div class="input-group">
+                        <label>Store Encoded (0-10):</label>
+                        <input type="number" id="store_encoded" value="2" step="1">
+                    </div>
+
+                    <button type="submit">Get Price Recommendation</button>
+                </form>
+            </div>
+
+            <div class="result-panel">
+                <div id="result" style="display:none;">
+                    <div class="price-card">
+                        <div class="price-label">Recommended Price</div>
+                        <div class="price" id="price">$0.00</div>
+                        <div class="price-label" id="original-price"></div>
+                        <div class="confidence">
+                            Confidence: <span id="confidence-value">--</span>
+                            (<span id="confidence-level"></span>)
+                        </div>
+                        <div class="prediction-interval" id="prediction-interval"></div>
+                    </div>
+
+                    <div style="font-weight: 600; margin-bottom: 10px;">Explanation</div>
+                    <div class="explanation-box" id="explanation"></div>
+
+                    <div style="font-weight: 600; margin-bottom: 10px;">Key Factors</div>
+                    <div id="factors" class="factors"></div>
+
+                    <div id="rules-box" style="display:none;" class="rules-applied"></div>
+                    <div id="warnings-box" style="display:none;" class="warnings-box"></div>
+                    <div id="recommendations-box" style="display:none;" class="recommendations-box"></div>
+                </div>
+                <div id="loading" class="loading">Loading... Generating recommendation...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('priceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+
+            const data = {
+                sales: parseFloat(document.getElementById('sales').value),
+                cost: parseFloat(document.getElementById('cost').value),
+                inventory: parseFloat(document.getElementById('inventory').value),
+                has_promo: document.getElementById('has_promo').checked ? 1 : 0,
+                seasonality_index: parseFloat(document.getElementById('seasonality_index').value),
+                elasticity: parseFloat(document.getElementById('elasticity').value),
+                competitor_price: parseFloat(document.getElementById('competitor_price').value),
+                item_encoded: parseInt(document.getElementById('item_encoded').value),
+                store_encoded: parseInt(document.getElementById('store_encoded').value),
+                current_price: 7.00
+            };
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Update price card
+                    document.getElementById('price').innerHTML = `$${result.predicted_price.toFixed(2)}`;
+                    document.getElementById('original-price').innerHTML = `Original: $${result.original_prediction.toFixed(2)} (${result.price_change_pct > 0 ? '+' : ''}${result.price_change_pct}%)`;
+                    document.getElementById('confidence-value').innerHTML = `${(result.confidence_score * 100).toFixed(0)}%`;
+
+                    const confidenceLevelSpan = document.getElementById('confidence-level');
+                    confidenceLevelSpan.innerHTML = result.confidence_level;
+                    confidenceLevelSpan.className = `confidence-${result.confidence_level.toLowerCase()}`;
+
+                    document.getElementById('prediction-interval').innerHTML = `95% Confidence Interval: $${result.prediction_interval.lower} - $${result.prediction_interval.upper}`;
+                    document.getElementById('explanation').innerHTML = result.explanation;
+
+                    // Display top factors
+                    const factorsDiv = document.getElementById('factors');
+                    factorsDiv.innerHTML = '';
+                    for (const [feature, details] of Object.entries(result.top_factors)) {
+                        const impactClass = details.impact === 'positive' ? 'impact-positive' : 'impact-negative';
+                        const impactSymbol = details.impact === 'positive' ? '+' : '-';
+                        factorsDiv.innerHTML += `
+                            <div class="factor">
+                                <div>
+                                    <span class="factor-name">${feature.replace(/_/g, ' ').toUpperCase()}</span>
+                                    <span class="factor-value"> (value: ${details.value.toFixed(2)})</span>
+                                </div>
+                                <div class="factor-impact ${impactClass}">
+                                    ${impactSymbol} ${Math.abs(details.shap_value).toFixed(2)}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    // Show business rules applied
+                    if (result.business_rules_applied && result.business_rules_applied.length > 0) {
+                        const rulesBox = document.getElementById('rules-box');
+                        rulesBox.innerHTML = `<strong>Business Rules Applied:</strong><br>${result.business_rules_applied.join('<br>')}`;
+                        rulesBox.style.display = 'block';
+                    } else {
+                        document.getElementById('rules-box').style.display = 'none';
+                    }
+
+                    // Show warnings
+                    if (result.warnings && result.warnings.length > 0) {
+                        const warningsBox = document.getElementById('warnings-box');
+                        warningsBox.innerHTML = `<strong>Warnings:</strong><br>${result.warnings.join('<br>')}`;
+                        warningsBox.style.display = 'block';
+                    } else {
+                        document.getElementById('warnings-box').style.display = 'none';
+                    }
+
+                    // Show recommendations
+                    if (result.recommendations && result.recommendations.length > 0) {
+                        const recommendationsBox = document.getElementById('recommendations-box');
+                        recommendationsBox.innerHTML = `<strong>Recommendations:</strong><br>${result.recommendations.join('<br>')}`;
+                        recommendationsBox.style.display = 'block';
+                    } else {
+                        document.getElementById('recommendations-box').style.display = 'none';
+                    }
+
+                    document.getElementById('result').style.display = 'block';
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
