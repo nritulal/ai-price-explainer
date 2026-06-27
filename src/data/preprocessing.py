@@ -1,4 +1,5 @@
 """Feature engineering and column derivation for M5 data"""
+import json
 
 import pandas as pd
 import numpy as np
@@ -319,5 +320,20 @@ class FeatureEngineer:
         print(f"  Date range: {result_df['date'].min()} to {result_df['date'].max()}")
         print(f"  Unique items: {result_df['item_id'].nunique()}")
         print(f"  Unique stores: {result_df['store_id'].nunique()}")
+        # At the end of preprocess_m5_data method, before return
+        # Save encoders for later use
+        import joblib
+        from src.utils.constants import PROCESSED_DATA_PATH
 
+        joblib.dump(le_item, PROCESSED_DATA_PATH / 'item_encoder.pkl')
+        joblib.dump(le_store, PROCESSED_DATA_PATH / 'store_encoder.pkl')
+
+        # Also save mapping for reference
+        item_mapping = {idx: item for idx, item in enumerate(le_item.classes_)}
+        store_mapping = {idx: store for idx, store in enumerate(le_store.classes_)}
+
+        with open(PROCESSED_DATA_PATH / 'item_mapping.json', 'w') as f:
+            json.dump(item_mapping, f, indent=2)
+        with open(PROCESSED_DATA_PATH / 'store_mapping.json', 'w') as f:
+            json.dump(store_mapping, f, indent=2)
         return result_df

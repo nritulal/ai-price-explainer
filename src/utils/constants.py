@@ -17,6 +17,12 @@ PROCESSED_DATA_PATH = PROJECT_ROOT / CONFIG["data"]["processed_path"]
 EXPERIMENTS_PATH = PROJECT_ROOT / "experiments"
 LOGS_PATH = EXPERIMENTS_PATH / "logs"
 
+# Add these to constants.py
+ITEM_MAPPING_PATH = PROCESSED_DATA_PATH / 'item_mapping.json'
+STORE_MAPPING_PATH = PROCESSED_DATA_PATH / 'store_mapping.json'
+ITEM_ENCODER_PATH = PROCESSED_DATA_PATH / 'item_encoder.pkl'
+STORE_ENCODER_PATH = PROCESSED_DATA_PATH / 'store_encoder.pkl'
+
 # Feature names
 INPUT_FEATURES = CONFIG["features"]["input_features"]
 TARGET = CONFIG["features"]["target"]

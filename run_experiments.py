@@ -286,7 +286,35 @@ def main():
     print(f"  Training Time: {metrics['training_time_seconds']:.2f} seconds")
     print(f"  Prediction Reliability: {uncertainty_scores['reliability_score']:.1%}")
     print(f"  Confidence Level: {uncertainty_scores['confidence_level']}")
+    # After model.save_model() in run_experiments.py
 
+    # Save encoders for web app
+    import joblib
+    from src.utils.constants import PROCESSED_DATA_PATH
+
+    # Save encoders from FeatureEngineer
+    if hasattr(dataloader.engineer, 'label_encoders'):
+        le_item = dataloader.engineer.label_encoders.get('item')
+        le_store = dataloader.engineer.label_encoders.get('store')
+
+        if le_item:
+            joblib.dump(le_item, PROCESSED_DATA_PATH / 'item_encoder.pkl')
+            print("[OK] Saved item encoder")
+        if le_store:
+            joblib.dump(le_store, PROCESSED_DATA_PATH / 'store_encoder.pkl')
+            print("[OK] Saved store encoder")
+
+        # Save mappings
+        if le_item:
+            item_mapping = {idx: item for idx, item in enumerate(le_item.classes_)}
+            with open(PROCESSED_DATA_PATH / 'item_mapping.json', 'w') as f:
+                json.dump(item_mapping, f, indent=2)
+            print("[OK] Saved item mapping")
+        if le_store:
+            store_mapping = {idx: store for idx, store in enumerate(le_store.classes_)}
+            with open(PROCESSED_DATA_PATH / 'store_mapping.json', 'w') as f:
+                json.dump(store_mapping, f, indent=2)
+            print("[OK] Saved store mapping")
 
 if __name__ == "__main__":
     main()
