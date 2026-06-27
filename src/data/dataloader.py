@@ -1,4 +1,4 @@
-"""Data loading and preparation for training"""
+"""Data loading and preparation for training - Enhanced Version"""
 
 import pandas as pd
 import numpy as np
@@ -44,20 +44,28 @@ class DataLoader:
         return sales_train, sell_prices, calendar
 
     def prepare_features(self, df: pd.DataFrame) -> tuple:
-        """Prepare features for model training"""
+        """Prepare enhanced features for model training"""
 
-        # Select features
-        feature_cols = ['sales', 'cost', 'inventory', 'has_promo',
-                        'seasonality_index', 'elasticity', 'competitor_price',
-                        'item_encoded', 'store_encoded']
+        # Enhanced feature list (NO item_encoded or store_encoded)
+        feature_cols = [
+            'sales_log', 'sales_ma7', 'sales_growth', 'sales_volatility',
+            'sales_normalized', 'sales_trend',
+            'cost', 'cost_ratio',
+            'inventory', 'inventory_ratio', 'inventory_status',
+            'has_promo', 'promo_intensity', 'promo_factor', 'promo_frequency',
+            'seasonality_index', 'seasonality_strength',
+            'elasticity', 'elasticity_magnitude', 'elasticity_confidence', 'elasticity_category',
+            'competitor_price', 'price_gap', 'price_gap_ratio', 'competitive_position',
+            'category_encoded'
+        ]
 
         # Ensure all columns exist
         missing_cols = [col for col in feature_cols if col not in df.columns]
         if missing_cols:
             print(f"Warning: Missing columns: {missing_cols}")
-            # Try to create missing columns with defaults
+            # Create missing columns with defaults
             for col in missing_cols:
-                if col in ['item_encoded', 'store_encoded']:
+                if col in ['category_encoded']:
                     df[col] = 0
                 else:
                     df[col] = 0.0
@@ -65,11 +73,19 @@ class DataLoader:
         X = df[feature_cols].copy()
         y = df['price'].copy()
 
-        # Scale numerical features
-        numerical_cols = ['sales', 'cost', 'inventory', 'seasonality_index',
-                          'elasticity', 'competitor_price']
+        # Numerical columns to scale (exclude categorical-like features)
+        numerical_cols = [
+            'sales_log', 'sales_ma7', 'sales_growth', 'sales_volatility',
+            'sales_normalized', 'sales_trend',
+            'cost', 'cost_ratio',
+            'inventory', 'inventory_ratio',
+            'promo_intensity', 'promo_frequency',
+            'seasonality_index', 'seasonality_strength',
+            'elasticity', 'elasticity_magnitude', 'elasticity_confidence',
+            'competitor_price', 'price_gap', 'price_gap_ratio', 'competitive_position'
+        ]
 
-        # Only scale columns that exist
+        # Scale numerical features
         existing_num_cols = [col for col in numerical_cols if col in X.columns]
         if existing_num_cols:
             X[existing_num_cols] = self.scaler.fit_transform(X[existing_num_cols])
@@ -117,7 +133,7 @@ class DataLoader:
     def process_pipeline(self, sample_size: int = None):
         """Complete data processing pipeline"""
         print("=" * 60)
-        print("Starting Data Processing Pipeline")
+        print("Starting Enhanced Data Processing Pipeline")
         print("=" * 60)
 
         # Load raw data
@@ -129,7 +145,7 @@ class DataLoader:
             print(f"Using sample of {sample_size} items for faster processing")
 
         # Feature engineering
-        print("\nEngineering features...")
+        print("\nEngineering enhanced features...")
         processed_df = self.engineer.preprocess_m5_data(sales_df, prices_df, calendar_df)
 
         # Save processed data

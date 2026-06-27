@@ -6,37 +6,48 @@ data:
 
 features:
   input_features:
-    - item_id
-    - store_id
-    - week
-    - sales
+    - sales_log
+    - sales_ma7
+    - sales_growth
     - cost
     - inventory
+    - inventory_ratio
     - has_promo
+    - promo_intensity
     - seasonality_index
     - elasticity
+    - elasticity_magnitude
     - competitor_price
+    - price_gap
+    - category_encoded
   target: "price"
   categorical_features:
-    - item_id
-    - store_id
+    - category_encoded
   numerical_features:
-    - sales
+    - sales_log
+    - sales_ma7
+    - sales_growth
     - cost
     - inventory
+    - inventory_ratio
+    - promo_intensity
     - seasonality_index
     - elasticity
+    - elasticity_magnitude
     - competitor_price
+    - price_gap
 
 model:
   type: "xgboost"
   params:
     n_estimators: 300
-    max_depth: 8
+    max_depth: 6
     learning_rate: 0.05
     subsample: 0.8
     colsample_bytree: 0.8
     random_state: 42
+    min_child_weight: 3
+    gamma: 0.1
 
 explainability:
   shap_background_samples: 100

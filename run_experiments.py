@@ -315,6 +315,37 @@ def main():
             with open(PROCESSED_DATA_PATH / 'store_mapping.json', 'w') as f:
                 json.dump(store_mapping, f, indent=2)
             print("[OK] Saved store mapping")
+        # Add this after model training and before the final print
+
+        # Save item and store mappings for the web app
+        print("\n[INFO] Saving item and store mappings for web app...")
+
+        # Get unique items and stores from training data
+        unique_items = train_df['item_id'].unique().tolist()
+        unique_stores = train_df['store_id'].unique().tolist()
+
+        # Create mappings
+        item_mapping = {i: item for i, item in enumerate(unique_items)}
+        store_mapping = {i: store for i, store in enumerate(unique_stores)}
+
+        # Save mappings
+        with open(PROCESSED_DATA_PATH / 'item_mapping.json', 'w') as f:
+            json.dump(item_mapping, f, indent=2)
+
+        with open(PROCESSED_DATA_PATH / 'store_mapping.json', 'w') as f:
+            json.dump(store_mapping, f, indent=2)
+
+        # Save reverse mappings for lookup
+        reverse_item_mapping = {item: i for i, item in enumerate(unique_items)}
+        reverse_store_mapping = {store: i for i, store in enumerate(unique_stores)}
+
+        with open(PROCESSED_DATA_PATH / 'reverse_item_mapping.json', 'w') as f:
+            json.dump(reverse_item_mapping, f, indent=2)
+
+        with open(PROCESSED_DATA_PATH / 'reverse_store_mapping.json', 'w') as f:
+            json.dump(reverse_store_mapping, f, indent=2)
+
+        print(f"[OK] Saved {len(unique_items)} items and {len(unique_stores)} stores for web app")
 
 if __name__ == "__main__":
     main()

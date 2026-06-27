@@ -1,4 +1,4 @@
-"""Constants and configuration loading"""
+"""Constants and configuration loading - Enhanced Version"""
 
 import yaml
 import os
@@ -16,12 +16,6 @@ RAW_DATA_PATH = PROJECT_ROOT / CONFIG["data"]["raw_path"]
 PROCESSED_DATA_PATH = PROJECT_ROOT / CONFIG["data"]["processed_path"]
 EXPERIMENTS_PATH = PROJECT_ROOT / "experiments"
 LOGS_PATH = EXPERIMENTS_PATH / "logs"
-
-# Add these to constants.py
-ITEM_MAPPING_PATH = PROCESSED_DATA_PATH / 'item_mapping.json'
-STORE_MAPPING_PATH = PROCESSED_DATA_PATH / 'store_mapping.json'
-ITEM_ENCODER_PATH = PROCESSED_DATA_PATH / 'item_encoder.pkl'
-STORE_ENCODER_PATH = PROCESSED_DATA_PATH / 'store_encoder.pkl'
 
 # Feature names
 INPUT_FEATURES = CONFIG["features"]["input_features"]
@@ -53,10 +47,30 @@ CATEGORY_MARGINS = {
 
 # Column derivation logic summary (for documentation)
 DERIVATION_LOGIC = {
-    'cost': 'sell_price * (1 - margin_ratio), margin_ratio by category (25-40%)',
-    'inventory': 'rolling_7day_sales * 14 - cumulative_sales + random_noise',
-    'has_promo': 'from event_type_1/event_name_1 columns, special holidays',
-    'seasonality_index': 'sales / rolling_13week_avg_sales * day_of_week_factor',
-    'elasticity': 'log-log regression: β from log(sales) ~ log(price) per item-store',
-    'competitor_price': 'sell_price * (1 + random_diff), diff ∈ [-0.15, +0.30]'
+    'sales_log': 'Log transformation of sales to handle wide range',
+    'sales_ma7': '7-day rolling average for demand trend',
+    'sales_growth': 'Sales growth rate for momentum',
+    'sales_volatility': 'Standard deviation of sales for stability',
+    'sales_normalized': 'Normalized sales within item-store',
+    'sales_trend': 'Increasing/decreasing sales trend',
+    'cost': 'sell_price * (1 - margin_ratio)',
+    'cost_ratio': 'Cost as percentage of price',
+    'inventory': 'Simulated inventory with replenishment',
+    'inventory_ratio': 'Days of cover',
+    'inventory_status': 'Low/medium/high inventory flag',
+    'has_promo': 'Binary promotion indicator',
+    'promo_intensity': 'Promotion intensity score (0-1)',
+    'promo_factor': 'Price adjustment factor (0.85-1.0)',
+    'promo_frequency': 'Rolling 30-day promotion frequency',
+    'seasonality_index': 'Combined seasonality (quarterly * weekly * monthly)',
+    'seasonality_strength': 'Deviation from normal (|index - 1.0|)',
+    'elasticity': 'Price sensitivity (log-log regression)',
+    'elasticity_magnitude': 'Absolute elasticity value',
+    'elasticity_confidence': 'Confidence in elasticity estimate',
+    'elasticity_category': 'Low/medium/high sensitivity category',
+    'competitor_price': 'Estimated competitor price',
+    'price_gap': 'Competitor price - our price',
+    'price_gap_ratio': 'Relative price gap',
+    'competitive_position': 'Our price / competitor price',
+    'category_encoded': 'Product category (FOODS, HOBBIES, etc.)'
 }

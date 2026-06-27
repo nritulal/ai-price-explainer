@@ -1,4 +1,4 @@
-"""Flask web application - Final working version"""
+"""Flask web application - Without Confidence Module"""
 
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
@@ -12,11 +12,11 @@ import traceback
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Import custom modules
+# Import modules
 from src.explainability.shap_explainer import SHAPExplainer
 from src.explainability.lime_explainer import LIMExplainer
+from src.explainability.comparator import ExplanationComparator
 from src.business.rules_engine import BusinessRulesEngine
-from src.evaluation.confidence import ConfidenceModule
 from src.utils.constants import PROCESSED_DATA_PATH, EXPERIMENTS_PATH
 
 app = Flask(__name__)
@@ -26,11 +26,12 @@ model = None
 feature_names = None
 shap_explainer = None
 lime_explainer = None
+comparator = None
 rules_engine = None
-confidence_module = None
 training_data = None
-item_encoder = None
-store_encoder = None
+scaler = None
+
+# Item and Store mappings
 item_mapping = {}
 store_mapping = {}
 reverse_item_mapping = {}
@@ -38,130 +39,94 @@ reverse_store_mapping = {}
 available_items = []
 available_stores = []
 
-# Feature display names (business-friendly)
+# Feature display names
 FEATURE_DISPLAY_NAMES = {
-    'sales': 'Sales Volume',
+    'sales_log': 'Sales Volume (log)',
+    'sales_ma7': 'Demand Trend',
+    'sales_growth': 'Sales Growth Rate',
+    'sales_volatility': 'Sales Stability',
+    'sales_normalized': 'Relative Demand',
+    'sales_trend': 'Sales Momentum',
     'cost': 'Product Cost',
+    'cost_ratio': 'Cost-to-Price Ratio',
     'inventory': 'Current Inventory',
+    'inventory_ratio': 'Days of Cover',
+    'inventory_status': 'Inventory Level',
     'has_promo': 'Promotion Status',
+    'promo_intensity': 'Promotion Intensity',
+    'promo_factor': 'Promo Price Factor',
+    'promo_frequency': 'Promotion Frequency',
     'seasonality_index': 'Seasonal Demand',
+    'seasonality_strength': 'Seasonality Strength',
     'elasticity': 'Price Sensitivity',
+    'elasticity_magnitude': 'Sensitivity Magnitude',
+    'elasticity_confidence': 'Elasticity Confidence',
+    'elasticity_category': 'Sensitivity Category',
     'competitor_price': 'Competitor Price',
-    'item_encoded': 'Item',
-    'store_encoded': 'Store'
+    'price_gap': 'Price Gap',
+    'price_gap_ratio': 'Price Gap Ratio',
+    'competitive_position': 'Competitive Position',
+    'category_encoded': 'Product Category'
 }
 
-# Features to hide from explanation (internal only)
-HIDDEN_FEATURES = ['item_encoded', 'store_encoded']
+HIDDEN_FEATURES = ['category_encoded']
 
 
-def create_fallback_mappings():
-    """Create proper fallback mappings for demo"""
+def load_mappings():
+    """Load item and store mappings"""
     global item_mapping, store_mapping, reverse_item_mapping, reverse_store_mapping
     global available_items, available_stores
 
-    print("[INFO] Creating fallback mappings...")
+    print("[INFO] Loading item and store mappings...")
 
-    # M5 dataset item categories
-    item_categories = ['FOODS_1', 'FOODS_2', 'FOODS_3', 'HOBBIES_1', 'HOBBIES_2', 'HOUSEHOLD_1', 'HOUSEHOLD_2']
+    try:
+        with open(PROCESSED_DATA_PATH / 'item_mapping.json', 'r') as f:
+            item_mapping = json.load(f)
+            item_mapping = {int(k): v for k, v in item_mapping.items()}
+            available_items = list(item_mapping.values())[:50]
+            reverse_item_mapping = {v: k for k, v in item_mapping.items()}
+            print(f"[OK] Item mapping loaded: {len(available_items)} items")
+    except FileNotFoundError:
+        print("[WARNING] item_mapping.json not found. Creating defaults...")
+        available_items = [
+            'FOODS_1_001', 'FOODS_1_002', 'FOODS_1_003', 'FOODS_1_004', 'FOODS_1_005',
+            'FOODS_1_006', 'FOODS_1_007', 'FOODS_1_008', 'FOODS_1_009', 'FOODS_1_010',
+            'FOODS_2_001', 'FOODS_2_002', 'FOODS_2_003', 'FOODS_2_004', 'FOODS_2_005',
+            'HOBBIES_1_001', 'HOBBIES_1_002', 'HOBBIES_1_003', 'HOBBIES_1_004', 'HOBBIES_1_005',
+            'HOBBIES_2_001', 'HOBBIES_2_002', 'HOBBIES_2_003', 'HOBBIES_2_004', 'HOBBIES_2_005',
+            'HOUSEHOLD_1_001', 'HOUSEHOLD_1_002', 'HOUSEHOLD_1_003', 'HOUSEHOLD_1_004', 'HOUSEHOLD_1_005'
+        ]
+        item_mapping = {i: item for i, item in enumerate(available_items)}
+        reverse_item_mapping = {item: i for i, item in enumerate(available_items)}
 
-    # Generate sample items
-    sample_items = []
-    for category in item_categories:
-        for i in range(1, 11):  # 10 items per category
-            sample_items.append(f"{category}_{i:03d}")
+    try:
+        with open(PROCESSED_DATA_PATH / 'store_mapping.json', 'r') as f:
+            store_mapping = json.load(f)
+            store_mapping = {int(k): v for k, v in store_mapping.items()}
+            available_stores = list(store_mapping.values())
+            reverse_store_mapping = {v: k for k, v in store_mapping.items()}
+            print(f"[OK] Store mapping loaded: {len(available_stores)} stores")
+    except FileNotFoundError:
+        print("[WARNING] store_mapping.json not found. Creating defaults...")
+        available_stores = ['CA_1', 'CA_2', 'CA_3', 'CA_4', 'TX_1', 'TX_2', 'TX_3', 'WI_1', 'WI_2', 'WI_3']
+        store_mapping = {i: store for i, store in enumerate(available_stores)}
+        reverse_store_mapping = {store: i for i, store in enumerate(available_stores)}
 
-    # Add some specific items from M5
-    sample_items.extend([
-        'FOODS_1_001', 'FOODS_1_002', 'FOODS_1_003', 'FOODS_1_004', 'FOODS_1_005',
-        'FOODS_2_001', 'FOODS_2_002', 'FOODS_2_003', 'FOODS_2_004', 'FOODS_2_005',
-        'HOBBIES_1_001', 'HOBBIES_1_002', 'HOBBIES_1_003', 'HOBBIES_2_001', 'HOBBIES_2_002'
-    ])
-
-    # Remove duplicates while preserving order
-    sample_items = list(dict.fromkeys(sample_items))
-
-    # M5 store IDs
-    sample_stores = ['CA_1', 'CA_2', 'CA_3', 'CA_4', 'TX_1', 'TX_2', 'TX_3', 'WI_1', 'WI_2', 'WI_3']
-
-    # Create mappings with consistent encoding
-    item_mapping = {i: item for i, item in enumerate(sample_items)}
-    reverse_item_mapping = {item: i for i, item in enumerate(sample_items)}
-
-    store_mapping = {i: store for i, store in enumerate(sample_stores)}
-    reverse_store_mapping = {store: i for i, store in enumerate(sample_stores)}
-
-    available_items = sample_items[:50]  # First 50 for dropdown
-    available_stores = sample_stores
-
-    print(f"[OK] Mappings created: {len(available_items)} items, {len(available_stores)} stores")
+    return True
 
 
 def load_models():
     """Load all required models and components"""
-    global model, feature_names, shap_explainer, lime_explainer, rules_engine
-    global confidence_module, training_data
-    global item_mapping, store_mapping, reverse_item_mapping, reverse_store_mapping
-    global available_items, available_stores
+    global model, feature_names, shap_explainer, lime_explainer, comparator
+    global rules_engine, training_data, scaler
 
     print("\n" + "=" * 60)
     print("Loading AI-Powered Price Explanations System")
     print("=" * 60)
 
-    # First, try to load mappings
-    try:
-        with open(PROCESSED_DATA_PATH / 'item_mapping.json', 'r') as f:
-            item_mapping = json.load(f)
-            if all(isinstance(k, str) for k in item_mapping.keys()):
-                item_mapping = {int(k): v for k, v in item_mapping.items()}
-            reverse_item_mapping = {v: k for k, v in item_mapping.items()}
-            available_items = list(item_mapping.values())[:50]
-            print(f"[OK] Item mapping loaded: {len(available_items)} items")
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        print("[WARNING] Could not load item mapping, creating fallback...")
-        create_fallback_mappings()
-
-    try:
-        with open(PROCESSED_DATA_PATH / 'store_mapping.json', 'r') as f:
-            store_mapping = json.load(f)
-            if all(isinstance(k, str) for k in store_mapping.keys()):
-                store_mapping = {int(k): v for k, v in store_mapping.items()}
-            reverse_store_mapping = {v: k for k, v in store_mapping.items()}
-            available_stores = list(store_mapping.values())
-            print(f"[OK] Store mapping loaded: {len(available_stores)} stores")
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        print("[WARNING] Could not load store mapping, using fallback...")
-        if not store_mapping:
-            create_fallback_mappings()
-
-    # Load model
-    model_path = EXPERIMENTS_PATH / 'model_xgboost.pkl'
-    if model_path.exists():
-        try:
-            model = joblib.load(model_path)
-            print("[OK] Model loaded")
-        except Exception as e:
-            print(f"[WARNING] Could not load model: {e}")
-            model = None
-    else:
-        print("[WARNING] No trained model found.")
-        model = None
-
-    # If no model, create a reasonable one for demo
-    if model is None:
-        print("[INFO] Creating demo model for testing...")
-        from sklearn.ensemble import RandomForestRegressor
-        model = RandomForestRegressor(n_estimators=50, max_depth=6, random_state=42)
-        # Train on synthetic data with realistic pricing
-        np.random.seed(42)
-        n_samples = 2000
-        X_demo = np.random.randn(n_samples, 9)
-        # Realistic weights: cost and competitor price are most important
-        true_weights = np.array([0.15, 0.50, 0.05, -0.05, 0.10, -0.15, 0.30, 0.02, 0.02])
-        y_demo = 3.0 + X_demo @ true_weights + np.random.randn(n_samples) * 0.3
-        y_demo = np.clip(y_demo, 0.5, 15.0)
-        model.fit(X_demo, y_demo)
-        print("[OK] Demo model created with realistic pricing")
+    if not load_mappings():
+        print("[ERROR] Failed to load mappings")
+        return False
 
     # Load feature names
     feature_path = PROCESSED_DATA_PATH / 'feature_names.json'
@@ -169,27 +134,43 @@ def load_models():
         try:
             with open(feature_path, 'r') as f:
                 feature_names = json.load(f)
-            print(f"[OK] Feature names loaded")
-        except:
-            feature_names = ['sales', 'cost', 'inventory', 'has_promo',
-                             'seasonality_index', 'elasticity', 'competitor_price',
-                             'item_encoded', 'store_encoded']
+            print(f"[OK] Feature names loaded: {len(feature_names)} features")
+        except Exception as e:
+            print(f"[ERROR] Could not load feature names: {e}")
+            return False
     else:
-        feature_names = ['sales', 'cost', 'inventory', 'has_promo',
-                         'seasonality_index', 'elasticity', 'competitor_price',
-                         'item_encoded', 'store_encoded']
+        print("[ERROR] feature_names.json not found!")
+        return False
 
-    # Load training data for confidence module
+    # Load trained model
+    model_path = EXPERIMENTS_PATH / 'model_xgboost.pkl'
+    if model_path.exists():
+        try:
+            model = joblib.load(model_path)
+            print("[OK] XGBoost model loaded")
+        except Exception as e:
+            print(f"[ERROR] Could not load model: {e}")
+            return False
+    else:
+        print("[ERROR] Trained model not found!")
+        return False
+
+    # Load scaler if available
+    try:
+        scaler = joblib.load(PROCESSED_DATA_PATH / 'scaler.pkl')
+        print("[OK] Scaler loaded")
+    except:
+        print("[WARNING] Scaler not found, using raw features")
+        scaler = None
+
+    # Load training data
     data_path = PROCESSED_DATA_PATH / 'processed_data.csv'
     if data_path.exists():
         try:
             df = pd.read_csv(data_path, nrows=1000)
-            feature_cols = ['sales', 'cost', 'inventory', 'has_promo',
-                            'seasonality_index', 'elasticity', 'competitor_price',
-                            'item_encoded', 'store_encoded']
-            existing_cols = [col for col in feature_cols if col in df.columns]
-            if existing_cols:
-                training_data = df[existing_cols].values
+            feature_cols = [col for col in feature_names if col in df.columns]
+            if feature_cols:
+                training_data = df[feature_cols].values
                 print(f"[OK] Training data loaded: {len(training_data)} samples")
             else:
                 training_data = None
@@ -197,18 +178,20 @@ def load_models():
             print(f"[WARNING] Could not load training data: {e}")
             training_data = None
 
-    # Initialize explainers
+    # Initialize SHAP explainer
     try:
         if training_data is not None and len(training_data) > 0:
             background = training_data[:min(100, len(training_data))]
         else:
             background = np.random.randn(100, len(feature_names))
+
         shap_explainer = SHAPExplainer(model, background)
         print("[OK] SHAP explainer initialized")
     except Exception as e:
         print(f"[WARNING] Could not initialize SHAP: {e}")
         shap_explainer = None
 
+    # Initialize LIME explainer
     try:
         if training_data is not None and len(training_data) > 0:
             lime_explainer = LIMExplainer(model, training_data[:min(100, len(training_data))], feature_names)
@@ -219,20 +202,23 @@ def load_models():
         print(f"[WARNING] Could not initialize LIME: {e}")
         lime_explainer = None
 
-    # Initialize confidence module
+    # Initialize comparator
     try:
-        confidence_module = ConfidenceModule(model, feature_names)
-        if training_data is not None and len(training_data) > 0:
-            confidence_module.set_training_data(training_data, np.zeros(len(training_data)))
-        print("[OK] Confidence module initialized")
+        comparator = ExplanationComparator(shap_explainer, lime_explainer)
+        print("[OK] Explanation comparator initialized")
     except Exception as e:
-        print(f"[WARNING] Could not initialize confidence module: {e}")
-        confidence_module = None
+        print(f"[WARNING] Could not initialize comparator: {e}")
+        comparator = None
 
     # Initialize business rules
-    rules_engine = BusinessRulesEngine()
+    try:
+        rules_engine = BusinessRulesEngine()
+        print("[OK] Business rules engine initialized")
+    except Exception as e:
+        print(f"[ERROR] Could not initialize business rules: {e}")
+        return False
 
-    print("[OK] All components initialized")
+    print("[OK] All components initialized successfully!")
     return True
 
 
@@ -245,21 +231,11 @@ def get_encoded_value(item_id, store_id):
             item_encoded = reverse_item_mapping[item_id]
         else:
             item_encoded = abs(hash(item_id)) % 100
-            if item_id not in reverse_item_mapping.values():
-                idx = len(item_mapping)
-                item_mapping[idx] = item_id
-                reverse_item_mapping[item_id] = idx
-                item_encoded = idx
 
         if store_id in reverse_store_mapping:
             store_encoded = reverse_store_mapping[store_id]
         else:
             store_encoded = abs(hash(store_id)) % 10
-            if store_id not in reverse_store_mapping.values():
-                idx = len(store_mapping)
-                store_mapping[idx] = store_id
-                reverse_store_mapping[store_id] = idx
-                store_encoded = idx
 
         return int(item_encoded), int(store_encoded)
     except Exception as e:
@@ -267,16 +243,76 @@ def get_encoded_value(item_id, store_id):
         return abs(hash(item_id)) % 100, abs(hash(store_id)) % 10
 
 
-def get_item_store_from_encoded(item_encoded, store_encoded):
-    """Get actual item and store names from encoded values"""
-    item_name = item_mapping.get(item_encoded, f"Item_{item_encoded}")
-    store_name = store_mapping.get(store_encoded, f"Store_{store_encoded}")
-    return item_name, store_name
+def derive_all_features(sales, cost, inventory, has_promo, seasonality, elasticity,
+                        competitor_price, current_price, category_encoded):
+    """Derive all 26 features from simple inputs"""
+
+    # Sales features
+    sales_log = np.log1p(sales)
+    sales_ma7 = sales
+    sales_growth = 0.0
+    sales_volatility = 0.0
+    sales_normalized = 0.0
+    sales_trend = 0.0
+
+    # Cost features
+    cost_ratio = cost / (current_price + 0.01) if current_price > 0 else 0.5
+    cost_ratio = np.clip(cost_ratio, 0.05, 0.95)
+
+    # Inventory features
+    daily_sales = max(sales / 30, 1)
+    inventory_ratio = inventory / (daily_sales + 1)
+    inventory_ratio = np.clip(inventory_ratio, 0, 100)
+
+    if inventory_ratio < 5:
+        inventory_status = 0
+    elif inventory_ratio < 20:
+        inventory_status = 1
+    else:
+        inventory_status = 2
+
+    # Promotion features
+    promo_intensity = has_promo * 0.5
+    promo_factor = 1 - (promo_intensity * 0.15)
+    promo_frequency = has_promo * 0.3
+
+    # Seasonality features
+    seasonality_strength = abs(seasonality - 1.0)
+
+    # Elasticity features
+    elasticity_magnitude = abs(elasticity)
+    elasticity_confidence = 0.7
+    if elasticity_magnitude < 0.5:
+        elasticity_category = 0
+    elif elasticity_magnitude < 1.0:
+        elasticity_category = 1
+    else:
+        elasticity_category = 2
+
+    # Competitor features
+    price_gap = competitor_price - current_price
+    price_gap_ratio = price_gap / (current_price + 0.01) if current_price > 0 else 0
+    price_gap_ratio = np.clip(price_gap_ratio, -0.5, 0.5)
+    competitive_position = current_price / (competitor_price + 0.01) if competitor_price > 0 else 1.0
+    competitive_position = np.clip(competitive_position, 0.5, 1.5)
+
+    # Return all 26 features
+    return [
+        sales_log, sales_ma7, sales_growth, sales_volatility,
+        sales_normalized, sales_trend,
+        cost, cost_ratio,
+        inventory, inventory_ratio, inventory_status,
+        has_promo, promo_intensity, promo_factor, promo_frequency,
+        seasonality, seasonality_strength,
+        elasticity, elasticity_magnitude, elasticity_confidence, elasticity_category,
+        competitor_price, price_gap, price_gap_ratio, competitive_position,
+        category_encoded
+    ]
 
 
 @app.route('/')
 def index():
-    """Render the main page with dropdown options"""
+    """Render the main page"""
     return render_template('index.html',
                            items=available_items,
                            stores=available_stores)
@@ -292,15 +328,14 @@ def predict():
 
         data = request.json
 
-        # Get real Item and Store IDs
+        # Get Item and Store IDs
         item_id = data.get('item_id', 'FOODS_1_001')
         store_id = data.get('store_id', 'CA_1')
-        print(f"Item: {item_id}, Store: {store_id}")
 
         # Get encoded values
         item_encoded, store_encoded = get_encoded_value(item_id, store_id)
 
-        # Get other input values
+        # Get user inputs
         sales = float(data.get('sales', 1000))
         cost = float(data.get('cost', 5.00))
         inventory = float(data.get('inventory', 5000))
@@ -310,20 +345,24 @@ def predict():
         competitor_price = float(data.get('competitor_price', 8.50))
         current_price = float(data.get('current_price', 7.00))
 
-        # Create feature array
-        feature_order = ['sales', 'cost', 'inventory', 'has_promo',
-                         'seasonality_index', 'elasticity', 'competitor_price',
-                         'item_encoded', 'store_encoded']
+        # Derive all features
+        category_encoded = item_encoded % 10
+        features = derive_all_features(
+            sales, cost, inventory, has_promo, seasonality, elasticity,
+            competitor_price, current_price, category_encoded
+        )
 
-        features = np.array([[
-            sales, cost, inventory, has_promo,
-            seasonality, elasticity, competitor_price,
-            item_encoded, store_encoded
-        ]])
+        features_array = np.array([features])
+
+        # Apply scaling if available
+        if scaler is not None:
+            try:
+                features_array = scaler.transform(features_array)
+            except Exception as e:
+                print(f"[WARNING] Scaling failed: {e}")
 
         # Predict
-        predicted_price = float(model.predict(features)[0])
-        print(f"Predicted: ${predicted_price:.2f}")
+        predicted_price = float(model.predict(features_array)[0])
 
         # Apply business rules
         adjusted = rules_engine.apply_rules(
@@ -334,58 +373,45 @@ def predict():
         )
 
         final_price = float(adjusted['adjusted_price'])
-        print(f"Final: ${final_price:.2f}")
 
-        # Generate explanations
-        explanation_text = ""
-        top_features = {}
-        base_value = 5.0
+        # Generate SHAP explanation
+        shap_exp = shap_explainer.explain_prediction(features_array, feature_names)
+        shap_features = dict(list(shap_exp['features'].items())[:5])
+        base_value = float(shap_exp['base_value'])
 
-        if shap_explainer is not None:
-            try:
-                shap_exp = shap_explainer.explain_prediction(features, feature_names)
-                top_features = dict(list(shap_exp['features'].items())[:5])
-                base_value = float(shap_exp['base_value'])
+        # Generate LIME explanation
+        lime_exp = lime_explainer.explain_prediction(features_array)
+        lime_features = dict(list(lime_exp['features'].items())[:5])
 
-                # Filter out hidden features for explanation
-                display_features = {}
-                for feat, details in top_features.items():
-                    if feat not in HIDDEN_FEATURES:
-                        display_features[feat] = details
-                    else:
-                        # For encoded features, use the actual names
-                        if feat == 'item_encoded':
-                            display_features['Item'] = {
-                                'value': item_id,
-                                'shap_value': details['shap_value'],
-                                'impact': details['impact']
-                            }
-                        elif feat == 'store_encoded':
-                            display_features['Store'] = {
-                                'value': store_id,
-                                'shap_value': details['shap_value'],
-                                'impact': details['impact']
-                            }
+        # Compare SHAP and LIME
+        comparison_result = comparator.compare_explanations(features_array[0], feature_names)
 
-                # Get top 3 for explanation
-                top_list = list(display_features.items())[:3]
-                parts = []
-                for feature, details in top_list:
-                    impact = "+" if details.get('impact') == 'positive' else "-"
-                    name = FEATURE_DISPLAY_NAMES.get(feature, feature.replace('_', ' ').title())
-                    val = details.get('value', 0)
-                    shap_val = abs(details.get('shap_value', 0))
-                    # Format nicely
-                    if isinstance(val, str):
-                        parts.append(f"  * {impact} {name}: {val} ({impact} price by ${shap_val:.2f})")
-                    else:
-                        parts.append(f"  * {impact} {name}: {val:.2f} ({impact} price by ${shap_val:.2f})")
+        # Build display features
+        display_features = {}
+        for feat, details in shap_features.items():
+            if feat not in HIDDEN_FEATURES:
+                display_name = FEATURE_DISPLAY_NAMES.get(feat, feat.replace('_', ' ').title())
+                display_features[display_name] = details
 
-                explanation_text = f"""
+        # Create explanation
+        top_list = list(display_features.items())[:4]
+        parts = []
+        for feature, details in top_list:
+            impact = "+" if details.get('impact') == 'positive' else "-"
+            val = details.get('value', 0)
+            shap_val = abs(details.get('shap_value', 0))
+            if isinstance(val, str):
+                parts.append(f"  * {impact} {feature}: {val} ({impact} price by ${shap_val:.2f})")
+            else:
+                parts.append(f"  * {impact} {feature}: {val:.2f} ({impact} price by ${shap_val:.2f})")
+
+        price_change_pct = ((final_price - current_price) / current_price) * 100 if current_price > 0 else 0
+
+        explanation_text = f"""
 PRICE RECOMMENDATION: ${final_price:.2f}
 
 Item: {item_id} | Store: {store_id}
-Current Price: ${current_price:.2f} | Change: {((final_price - current_price) / current_price * 100):+.1f}%
+Current Price: ${current_price:.2f} | Change: {price_change_pct:+.1f}%
 
 Why this price?
 
@@ -394,7 +420,7 @@ The recommended price is based on the following key factors:
 {chr(10).join(parts)}
 
 Business Insight:
-The base price would have been ${base_value:.2f}. The adjustments above reflect current market conditions, demand patterns, and competitive landscape for {item_id} at {store_id}.
+The base price would have been ${base_value:.2f}. The adjustments above reflect current market conditions, demand patterns, and competitive landscape.
 
 Recommendation:
 This price aligns with market dynamics and maximizes expected revenue.
@@ -403,56 +429,17 @@ Actionable Next Steps:
 - Monitor competitor prices for elastic items
 - Consider promotional bundling if inventory is high
 - Review pricing strategy for items with high seasonality
-                """
+        """
 
-                # Update top_features for display (hide encoded features)
-                top_features = display_features
+        # Build LIME display features
+        lime_display_features = {}
+        for feat, details in lime_features.items():
+            if feat not in HIDDEN_FEATURES:
+                display_name = FEATURE_DISPLAY_NAMES.get(feat, feat.replace('_', ' ').title())
+                lime_display_features[display_name] = details
 
-            except Exception as e:
-                print(f"SHAP error: {e}")
-                explanation_text = f"Price recommendation: ${final_price:.2f} for {item_id} at {store_id}"
-                top_features = {
-                    'Competitor Price': {'value': competitor_price, 'shap_value': 0.5, 'impact': 'positive'},
-                    'Product Cost': {'value': cost, 'shap_value': 0.3, 'impact': 'positive'},
-                    'Sales Volume': {'value': sales, 'shap_value': 0.1, 'impact': 'positive'}
-                }
-
-        # Confidence scores
-        if confidence_module is not None:
-            try:
-                uncertainty_scores = confidence_module.calculate_uncertainty_score(features[0], final_price)
-                prediction_interval = confidence_module.calculate_prediction_interval(features[0])
-                reliability_factors = confidence_module.get_reliability_factors(
-                    {'features': top_features, 'base_value': base_value}, final_price
-                )
-
-                # Fix prediction interval if it's unreasonable
-                if prediction_interval.get('lower_bound', 0) < final_price * 0.5 or prediction_interval.get(
-                        'upper_bound', 0) > final_price * 2:
-                    prediction_interval['lower_bound'] = final_price * 0.9
-                    prediction_interval['upper_bound'] = final_price * 1.1
-
-            except Exception as e:
-                print(f"Confidence error: {e}")
-                uncertainty_scores = {'reliability_score': 0.8, 'confidence_level': 'High', 'uncertainty_score': 0.2}
-                prediction_interval = {'lower_bound': final_price * 0.9, 'upper_bound': final_price * 1.1}
-                reliability_factors = {'warnings': [], 'recommendations': ['Monitor sales performance']}
-        else:
-            uncertainty_scores = {'reliability_score': 0.8, 'confidence_level': 'High', 'uncertainty_score': 0.2}
-            prediction_interval = {'lower_bound': final_price * 0.9, 'upper_bound': final_price * 1.1}
-            reliability_factors = {'warnings': [], 'recommendations': ['Monitor sales performance']}
-
-        # Calculate price change
-        price_change_pct = ((final_price - current_price) / current_price) * 100 if current_price > 0 else 0
-
-        # Determine confidence color
-        confidence_level = uncertainty_scores.get('confidence_level', 'Medium')
-        if confidence_level == 'High':
-            confidence_color = 'green'
-        elif confidence_level == 'Medium':
-            confidence_color = 'orange'
-        else:
-            confidence_color = 'red'
+        # ====== NO CONFIDENCE MODULE - REMOVED COMPLETELY ======
+        # Just return the prediction and explanations without confidence scores
 
         response = {
             'success': True,
@@ -464,25 +451,20 @@ Actionable Next Steps:
             'price_change_pct': round(price_change_pct, 1),
             'price_change_abs': round(final_price - current_price, 2),
             'explanation': explanation_text.strip(),
-            'top_factors': top_features,
-            'confidence_score': round(uncertainty_scores.get('reliability_score', 0.8), 2),
-            'confidence_level': confidence_level,
-            'confidence_color': confidence_color,
-            'uncertainty_score': round(uncertainty_scores.get('uncertainty_score', 0.2), 3),
-            'prediction_interval': {
-                'lower': round(prediction_interval.get('lower_bound', final_price * 0.9), 2),
-                'upper': round(prediction_interval.get('upper_bound', final_price * 1.1), 2)
-            },
-            'uncertainty_components': uncertainty_scores.get('components', {}),
-            'warnings': reliability_factors.get('warnings', []),
-            'recommendations': reliability_factors.get('recommendations', ['Monitor sales performance']),
+            'shap_factors': display_features,
+            'lime_factors': lime_display_features,
             'business_rules_applied': adjusted['rules_applied'],
             'base_value': round(base_value, 2),
             'item_encoded': int(item_encoded),
-            'store_encoded': int(store_encoded)
+            'store_encoded': int(store_encoded),
+            'comparison': {
+                'agreement_score': round(comparison_result['agreement_score'] * 100, 1),
+                'correlation': round(comparison_result['correlation'], 3),
+                'consistent': comparison_result['consistent']
+            }
         }
 
-        print(f"✅ Success!")
+        print(f"✅ Success! Returning response")
         return jsonify(response)
 
     except Exception as e:
@@ -495,21 +477,11 @@ Actionable Next Steps:
 def health():
     """Health check endpoint"""
     return jsonify({
-        'status': 'healthy',
+        'status': 'healthy' if model is not None else 'unhealthy',
         'model_loaded': model is not None,
         'features_loaded': feature_names is not None,
-        'confidence_module_ready': confidence_module is not None,
         'items_available': len(available_items),
         'stores_available': len(available_stores)
-    })
-
-
-@app.route('/items', methods=['GET'])
-def get_items():
-    """Get list of available items"""
-    return jsonify({
-        'items': available_items,
-        'stores': available_stores
     })
 
 
@@ -528,4 +500,10 @@ if __name__ == '__main__':
         print("=" * 60 + "\n")
         app.run(debug=True, port=5000, threaded=True)
     else:
-        print("\n❌ Failed to load models.")
+        print("\n" + "=" * 60)
+        print("❌ SYSTEM NOT READY")
+        print("=" * 60)
+        print("\nPlease run the following steps:")
+        print("1. python run_experiments.py")
+        print("2. python app.py")
+        print("=" * 60 + "\n")

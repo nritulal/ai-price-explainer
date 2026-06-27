@@ -33,14 +33,15 @@
         }
         .input-panel {
             flex: 1;
-            min-width: 320px;
+            min-width: 350px;
+            max-width: 550px;
         }
         .result-panel {
-            flex: 1;
+            flex: 2;
             min-width: 450px;
         }
         .input-group {
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             flex-wrap: wrap;
@@ -75,6 +76,16 @@
             width: auto;
             min-width: auto;
         }
+        .section-header {
+            background: #f8f9fa;
+            padding: 6px 12px;
+            border-radius: 4px;
+            margin: 12px 0 8px 0;
+            font-weight: 700;
+            color: #2c3e50;
+            border-left: 4px solid #3498db;
+            font-size: 13px;
+        }
         button {
             background: #3498db;
             color: white;
@@ -84,7 +95,7 @@
             cursor: pointer;
             font-size: 16px;
             font-weight: 600;
-            margin-top: 15px;
+            margin-top: 20px;
             width: 100%;
             transition: background 0.3s;
         }
@@ -121,15 +132,6 @@
             opacity: 0.8;
             margin: 5px 0;
         }
-        .confidence {
-            font-size: 14px;
-            margin-top: 10px;
-        }
-        .prediction-interval {
-            font-size: 12px;
-            margin-top: 5px;
-            opacity: 0.8;
-        }
         .explanation-box {
             background: #f8f9fa;
             padding: 20px;
@@ -143,19 +145,53 @@
             max-height: 400px;
             overflow-y: auto;
         }
+        .explanation-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            margin-top: 10px;
+        }
+        .tab-btn {
+            padding: 8px 20px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        .tab-btn.active {
+            border-color: #3498db;
+            background: #e8f4fd;
+            color: #2980b9;
+        }
+        .tab-btn:hover {
+            border-color: #3498db;
+            background: #f0f7ff;
+        }
+        .factors-container {
+            display: none;
+        }
+        .factors-container.active {
+            display: block;
+        }
         .factors {
-            margin-top: 20px;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
         }
         .factor {
-            padding: 10px 15px;
-            margin: 8px 0;
+            padding: 8px 12px;
+            margin: 5px 0;
             background: white;
-            border-radius: 8px;
+            border-radius: 6px;
             border-left: 4px solid #3498db;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 13px;
         }
         .factor-name {
             font-weight: 600;
@@ -163,11 +199,11 @@
         }
         .factor-value {
             color: #7f8c8d;
-            font-size: 13px;
+            font-size: 12px;
         }
         .factor-impact {
             font-weight: 600;
-            font-size: 16px;
+            font-size: 14px;
         }
         .impact-positive {
             color: #27ae60;
@@ -175,28 +211,27 @@
         .impact-negative {
             color: #e74c3c;
         }
+        .impact-neutral {
+            color: #95a5a6;
+        }
+        .comparison-box {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 13px;
+            border-left: 4px solid #3498db;
+        }
+        .comparison-box .agreement-high { color: #27ae60; font-weight: bold; }
+        .comparison-box .agreement-medium { color: #f39c12; font-weight: bold; }
+        .comparison-box .agreement-low { color: #e74c3c; font-weight: bold; }
         .rules-applied {
             background: #e8f4fd;
             padding: 15px;
             border-radius: 8px;
             margin-top: 15px;
             font-size: 13px;
-        }
-        .warnings-box {
-            background: #fff3cd;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            border-left: 4px solid #ffc107;
-            font-size: 13px;
-        }
-        .recommendations-box {
-            background: #d4edda;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            border-left: 4px solid #28a745;
-            font-size: 13px;
+            border-left: 4px solid #3498db;
         }
         .loading {
             display: none;
@@ -216,58 +251,29 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .error {
-            background: #fee;
-            color: #c0392b;
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
             padding: 15px;
             border-radius: 8px;
             margin-top: 15px;
-        }
-        hr {
-            margin: 20px 0;
-            border: none;
-            border-top: 1px solid #e0e0e0;
-        }
-        .confidence-high {
-            color: #27ae60;
-            font-weight: bold;
-        }
-        .confidence-medium {
-            color: #f39c12;
-            font-weight: bold;
-        }
-        .confidence-low {
-            color: #e74c3c;
-            font-weight: bold;
+            border: 1px solid #f5c6cb;
+            display: none;
         }
         .help-text {
-            font-size: 11px;
+            font-size: 10px;
             color: #999;
             margin-top: 2px;
             width: 100%;
             margin-left: 160px;
-        }
-        .badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-            margin-left: 8px;
-        }
-        .badge-high { background: #d4edda; color: #155724; }
-        .badge-medium { background: #fff3cd; color: #856404; }
-        .badge-low { background: #f8d7da; color: #721c24; }
-        .encoded-info {
-            font-size: 11px;
-            opacity: 0.6;
-            margin-top: 5px;
         }
         @media (max-width: 768px) {
             .input-group { flex-direction: column; align-items: flex-start; }
             label { width: auto; margin-bottom: 5px; }
             input, select { width: 100%; }
             .help-text { margin-left: 0; }
+            .explanation-tabs { flex-wrap: wrap; }
+            .input-panel { max-width: 100%; }
         }
     </style>
 </head>
@@ -278,7 +284,8 @@
 
         <div class="two-columns">
             <div class="input-panel">
-                <form id="priceForm">
+                <div id="inputForm">
+                    <div class="section-header">📦 Product</div>
                     <div class="input-group">
                         <label>Item ID:</label>
                         <select id="item_id" required>
@@ -299,6 +306,7 @@
                         </select>
                     </div>
 
+                    <div class="section-header">📊 Business Metrics</div>
                     <div class="input-group">
                         <label>Sales (units):</label>
                         <input type="number" id="sales" value="1000" step="100" min="0">
@@ -319,6 +327,7 @@
                         <input type="checkbox" id="has_promo">
                     </div>
 
+                    <div class="section-header">📈 Market Factors</div>
                     <div class="input-group">
                         <label>Seasonality Index:</label>
                         <input type="number" id="seasonality_index" value="1.2" step="0.1" min="0.1">
@@ -341,36 +350,42 @@
                         <input type="number" id="current_price" value="7.00" step="0.5" min="0">
                     </div>
 
-                    <button type="submit" id="predictBtn">Get Price Recommendation</button>
-                </form>
+                    <button id="predictBtn">Get Price Recommendation</button>
+                </div>
             </div>
 
             <div class="result-panel">
+                <div id="error-message" class="error-message"></div>
+
                 <div id="result" style="display:none;">
                     <div class="price-card">
                         <div class="price-label">Recommended Price</div>
                         <div class="price" id="price">$0.00</div>
                         <div class="item-info" id="item-info"></div>
                         <div class="price-change" id="price-change"></div>
-                        <div class="confidence">
-                            Confidence: <span id="confidence-value">--</span>
-                            <span id="confidence-level"></span>
-                        </div>
-                        <div class="prediction-interval" id="prediction-interval"></div>
-                        <div class="encoded-info">
-                            Encoded: Item=<span id="item-encoded-display">-</span>, Store=<span id="store-encoded-display">-</span>
-                        </div>
                     </div>
 
                     <div style="font-weight: 600; margin-bottom: 10px;">📝 Explanation</div>
                     <div class="explanation-box" id="explanation"></div>
 
                     <div style="font-weight: 600; margin-bottom: 10px;">📊 Key Factors</div>
-                    <div id="factors" class="factors"></div>
+
+                    <div class="explanation-tabs">
+                        <button class="tab-btn active" data-tab="shap">🔵 SHAP</button>
+                        <button class="tab-btn" data-tab="lime">🔴 LIME</button>
+                    </div>
+
+                    <div id="shap-factors" class="factors-container active">
+                        <div class="factors" id="shap-factors-list"></div>
+                    </div>
+
+                    <div id="lime-factors" class="factors-container">
+                        <div class="factors" id="lime-factors-list"></div>
+                    </div>
+
+                    <div id="comparison-box" style="display:none;" class="comparison-box"></div>
 
                     <div id="rules-box" style="display:none;" class="rules-applied"></div>
-                    <div id="warnings-box" style="display:none;" class="warnings-box"></div>
-                    <div id="recommendations-box" style="display:none;" class="recommendations-box"></div>
                 </div>
                 <div id="loading" class="loading">
                     <div class="loading-spinner"></div>
@@ -381,37 +396,41 @@
     </div>
 
     <script>
-        // Feature display names mapping
-        const FEATURE_DISPLAY_NAMES = {
-            'sales': 'Sales Volume',
-            'cost': 'Product Cost',
-            'inventory': 'Current Inventory',
-            'has_promo': 'Promotion Status',
-            'seasonality_index': 'Seasonal Demand',
-            'elasticity': 'Price Sensitivity',
-            'competitor_price': 'Competitor Price',
-            'item_encoded': 'Item',
-            'store_encoded': 'Store',
-            'Item': 'Item',
-            'Store': 'Store'
-        };
+        console.log("✅ Page loaded successfully");
 
-        document.getElementById('priceForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
 
-            // Validate inputs
+                document.querySelectorAll('.factors-container').forEach(c => c.classList.remove('active'));
+
+                const tab = this.dataset.tab;
+                document.getElementById(tab + '-factors').classList.add('active');
+            });
+        });
+
+        const predictBtn = document.getElementById('predictBtn');
+
+        predictBtn.addEventListener('click', async function(e) {
+            console.log("🔘 Button clicked!");
+
             const itemId = document.getElementById('item_id').value;
             const storeId = document.getElementById('store_id').value;
 
+            console.log("📦 Item:", itemId);
+            console.log("🏪 Store:", storeId);
+
             if (!itemId || !storeId) {
-                alert('Please select both an Item and a Store.');
+                showError('Please select both an Item and a Store.');
                 return;
             }
 
-            // Show loading
+            hideError();
+
             const loadingDiv = document.getElementById('loading');
             const resultDiv = document.getElementById('result');
-            const predictBtn = document.getElementById('predictBtn');
 
             loadingDiv.style.display = 'block';
             resultDiv.style.display = 'none';
@@ -431,126 +450,37 @@
                 current_price: parseFloat(document.getElementById('current_price').value) || 7.00
             };
 
-            try {
-                console.log('Sending request:', data);
+            console.log("📤 Sending request:", data);
 
+            try {
                 const response = await fetch('/predict', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
                     body: JSON.stringify(data)
                 });
 
+                console.log("📥 Response status:", response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("❌ Error response:", errorText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const result = await response.json();
-                console.log('Response:', result);
+                console.log("📥 Response data:", result);
 
                 if (result.success) {
-                    // Update price card
-                    document.getElementById('price').innerHTML = `$${result.predicted_price.toFixed(2)}`;
-
-                    // Show item and store info
-                    document.getElementById('item-info').innerHTML = `${result.item_id} | ${result.store_id}`;
-
-                    // Show price change
-                    const changeSign = result.price_change_pct > 0 ? '+' : '';
-                    const changeColor = result.price_change_pct > 0 ? '#4CAF50' : (result.price_change_pct < 0 ? '#f44336' : '#666');
-                    document.getElementById('price-change').innerHTML =
-                        `Current: $${result.current_price.toFixed(2)} → ` +
-                        `<span style="color:${changeColor};font-weight:bold;">` +
-                        `${changeSign}${result.price_change_pct}% (${changeSign}$${result.price_change_abs.toFixed(2)})` +
-                        `</span>`;
-
-                    // Confidence
-                    const confidencePercent = (result.confidence_score * 100).toFixed(0);
-                    document.getElementById('confidence-value').innerHTML = `${confidencePercent}%`;
-
-                    const confidenceLevelSpan = document.getElementById('confidence-level');
-                    const level = result.confidence_level || 'Medium';
-                    confidenceLevelSpan.innerHTML = ` (${level})`;
-                    confidenceLevelSpan.className = `confidence-${level.toLowerCase()}`;
-
-                    // Prediction interval
-                    document.getElementById('prediction-interval').innerHTML =
-                        `95% Confidence Interval: $${result.prediction_interval.lower} - $${result.prediction_interval.upper}`;
-
-                    // Show encoded values
-                    document.getElementById('item-encoded-display').innerHTML = result.item_encoded;
-                    document.getElementById('store-encoded-display').innerHTML = result.store_encoded;
-
-                    // Explanation - handle both string and object
-                    let explanationText = result.explanation || '';
-                    document.getElementById('explanation').innerHTML = explanationText;
-
-                    // Top factors
-                    const factorsDiv = document.getElementById('factors');
-                    factorsDiv.innerHTML = '';
-
-                    const topFactors = result.top_factors || {};
-                    for (const [feature, details] of Object.entries(topFactors)) {
-                        // Skip if no shap_value
-                        const shapValue = details.shap_value || 0;
-                        if (Math.abs(shapValue) < 0.001) continue;
-
-                        const impactClass = details.impact === 'positive' ? 'impact-positive' : 'impact-negative';
-                        const impactSymbol = details.impact === 'positive' ? '+' : '-';
-
-                        // Format the value display
-                        let valueDisplay = details.value;
-                        if (typeof details.value === 'string') {
-                            valueDisplay = details.value;
-                        } else if (typeof details.value === 'number') {
-                            valueDisplay = details.value.toFixed(2);
-                        }
-
-                        // Get display name
-                        const displayName = FEATURE_DISPLAY_NAMES[feature] || feature.replace(/_/g, ' ').toUpperCase();
-
-                        factorsDiv.innerHTML += `
-                            <div class="factor">
-                                <div>
-                                    <span class="factor-name">${displayName}</span>
-                                    <span class="factor-value"> (${valueDisplay})</span>
-                                </div>
-                                <div class="factor-impact ${impactClass}">
-                                    ${impactSymbol} $${Math.abs(shapValue).toFixed(2)}
-                                </div>
-                            </div>
-                        `;
-                    }
-
-                    // Business rules applied
-                    const rulesBox = document.getElementById('rules-box');
-                    if (result.business_rules_applied && result.business_rules_applied.length > 0) {
-                        rulesBox.innerHTML = `<strong>📋 Business Rules Applied:</strong><br>${result.business_rules_applied.join('<br>')}`;
-                        rulesBox.style.display = 'block';
-                    } else {
-                        rulesBox.style.display = 'none';
-                    }
-
-                    // Warnings
-                    const warningsBox = document.getElementById('warnings-box');
-                    if (result.warnings && result.warnings.length > 0) {
-                        warningsBox.innerHTML = `<strong>⚠️ Warnings:</strong><br>${result.warnings.join('<br>')}`;
-                        warningsBox.style.display = 'block';
-                    } else {
-                        warningsBox.style.display = 'none';
-                    }
-
-                    // Recommendations
-                    const recommendationsBox = document.getElementById('recommendations-box');
-                    if (result.recommendations && result.recommendations.length > 0) {
-                        recommendationsBox.innerHTML = `<strong>✅ Recommendations:</strong><br>${result.recommendations.join('<br>')}`;
-                        recommendationsBox.style.display = 'block';
-                    } else {
-                        recommendationsBox.style.display = 'none';
-                    }
-
-                    resultDiv.style.display = 'block';
+                    displayResult(result);
                 } else {
-                    alert('Error: ' + (result.error || 'Unknown error occurred'));
+                    showError('Error: ' + (result.error || 'Unknown error occurred'));
                 }
             } catch (error) {
-                console.error('Error:', error);
-                alert('Error: ' + error.message);
+                console.error('❌ Error:', error);
+                showError('Error: ' + error.message);
             } finally {
                 loadingDiv.style.display = 'none';
                 predictBtn.disabled = false;
@@ -558,16 +488,181 @@
             }
         });
 
-        // Auto-select first item and store for quick testing
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = '❌ ' + message;
+            errorDiv.style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+        }
+
+        function hideError() {
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        function safeNumber(value) {
+            if (typeof value === 'string') {
+                const parsed = parseFloat(value);
+                return isNaN(parsed) ? 0 : parsed;
+            }
+            if (typeof value === 'number') {
+                return value;
+            }
+            return 0;
+        }
+
+        function safeAbs(value) {
+            return Math.abs(safeNumber(value));
+        }
+
+        function displayResult(result) {
+            console.log("🎯 Displaying results");
+
+            try {
+                // Price
+                document.getElementById('price').innerHTML = `$${safeNumber(result.predicted_price).toFixed(2)}`;
+                document.getElementById('item-info').innerHTML = `${result.item_id} | ${result.store_id}`;
+
+                // Price change
+                const priceChangePct = safeNumber(result.price_change_pct);
+                const priceChangeAbs = safeNumber(result.price_change_abs);
+                const currentPrice = safeNumber(result.current_price);
+
+                const changeSign = priceChangePct > 0 ? '+' : '';
+                const changeColor = priceChangePct > 0 ? '#4CAF50' : (priceChangePct < 0 ? '#f44336' : '#666');
+                document.getElementById('price-change').innerHTML =
+                    `Current: $${currentPrice.toFixed(2)} → ` +
+                    `<span style="color:${changeColor};font-weight:bold;">` +
+                    `${changeSign}${priceChangePct.toFixed(1)}% (${changeSign}$${priceChangeAbs.toFixed(2)})` +
+                    `</span>`;
+
+                // Explanation
+                document.getElementById('explanation').innerHTML = result.explanation || 'No explanation available';
+
+                // SHAP Factors
+                const shapDiv = document.getElementById('shap-factors-list');
+                shapDiv.innerHTML = '';
+                const shapFactors = result.shap_factors || {};
+                let hasShap = false;
+                for (const [feature, details] of Object.entries(shapFactors)) {
+                    const shapValue = safeNumber(details.shap_value);
+                    if (safeAbs(shapValue) < 0.001) continue;
+                    hasShap = true;
+
+                    const impact = details.impact || 'neutral';
+                    const cls = impact === 'positive' ? 'impact-positive' : (impact === 'negative' ? 'impact-negative' : 'impact-neutral');
+                    const sym = impact === 'positive' ? '+' : (impact === 'negative' ? '-' : '');
+
+                    let val = details.value;
+                    if (typeof val === 'string') { /* keep */ }
+                    else if (typeof val === 'number') { val = val.toFixed(2); }
+                    else { val = 'N/A'; }
+
+                    shapDiv.innerHTML += `
+                        <div class="factor">
+                            <div>
+                                <span class="factor-name">${feature}</span>
+                                <span class="factor-value"> (${val})</span>
+                            </div>
+                            <div class="factor-impact ${cls}">
+                                ${sym} $${safeAbs(shapValue).toFixed(2)}
+                            </div>
+                        </div>
+                    `;
+                }
+                if (!hasShap) {
+                    shapDiv.innerHTML = '<div style="color:#999; padding:10px;">No SHAP factors available</div>';
+                }
+
+                // LIME Factors
+                const limeDiv = document.getElementById('lime-factors-list');
+                limeDiv.innerHTML = '';
+                const limeFactors = result.lime_factors || {};
+                let hasLime = false;
+                for (const [feature, details] of Object.entries(limeFactors)) {
+                    const limeValue = safeNumber(details.abs_impact || details.value || 0);
+                    if (safeAbs(limeValue) < 0.001) continue;
+                    hasLime = true;
+
+                    const impact = details.impact || 'neutral';
+                    const cls = impact === 'positive' ? 'impact-positive' : (impact === 'negative' ? 'impact-negative' : 'impact-neutral');
+                    const sym = impact === 'positive' ? '+' : (impact === 'negative' ? '-' : '');
+
+                    let val = details.value;
+                    if (typeof val === 'string') { /* keep */ }
+                    else if (typeof val === 'number') { val = val.toFixed(2); }
+                    else { val = 'N/A'; }
+
+                    limeDiv.innerHTML += `
+                        <div class="factor">
+                            <div>
+                                <span class="factor-name">${feature}</span>
+                                <span class="factor-value"> (${val})</span>
+                            </div>
+                            <div class="factor-impact ${cls}">
+                                ${sym} ${safeAbs(limeValue).toFixed(2)}
+                            </div>
+                        </div>
+                    `;
+                }
+                if (!hasLime) {
+                    limeDiv.innerHTML = '<div style="color:#999; padding:10px;">No LIME factors available</div>';
+                }
+
+                // Comparison
+                const compBox = document.getElementById('comparison-box');
+                if (result.comparison && result.comparison.agreement_score !== null) {
+                    const agreement = safeNumber(result.comparison.agreement_score);
+                    let cls = 'agreement-low', text = 'Low';
+                    if (agreement >= 70) { cls = 'agreement-high'; text = 'High'; }
+                    else if (agreement >= 40) { cls = 'agreement-medium'; text = 'Medium'; }
+
+                    compBox.innerHTML = `
+                        <strong>🔍 SHAP vs LIME Agreement</strong><br>
+                        Agreement Score: <span class="${cls}">${agreement.toFixed(1)}%</span> (${text})<br>
+                        Correlation: ${result.comparison.correlation || 'N/A'}<br>
+                        Consistent: ${result.comparison.consistent ? '✅ Yes' : '❌ No'}
+                    `;
+                    compBox.style.display = 'block';
+                } else {
+                    compBox.style.display = 'none';
+                }
+
+                // Business Rules
+                const rulesBox = document.getElementById('rules-box');
+                if (result.business_rules_applied && result.business_rules_applied.length > 0) {
+                    rulesBox.innerHTML = `<strong>📋 Business Rules Applied:</strong><br>${result.business_rules_applied.join('<br>')}`;
+                    rulesBox.style.display = 'block';
+                } else {
+                    rulesBox.style.display = 'none';
+                }
+
+                document.getElementById('result').style.display = 'block';
+                console.log("✅ Results displayed successfully");
+            } catch (err) {
+                console.error("❌ Error displaying results:", err);
+                showError("Error displaying results: " + err.message);
+            }
+        }
+
+        // Auto-select first item and store
         document.addEventListener('DOMContentLoaded', function() {
+            console.log("🚀 DOM loaded, auto-selecting first options...");
+
             const itemSelect = document.getElementById('item_id');
             const storeSelect = document.getElementById('store_id');
 
             if (itemSelect.options.length > 1) {
                 itemSelect.selectedIndex = 1;
+                console.log("✅ Auto-selected item:", itemSelect.value);
+            } else {
+                console.warn("⚠️ No items available in dropdown");
             }
+
             if (storeSelect.options.length > 1) {
                 storeSelect.selectedIndex = 1;
+                console.log("✅ Auto-selected store:", storeSelect.value);
+            } else {
+                console.warn("⚠️ No stores available in dropdown");
             }
         });
     </script>

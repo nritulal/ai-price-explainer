@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from src.utils.constants import PROCESSED_DATA_PATH
 import json
+import re
 
 
 class SHAPExplainer:
@@ -114,3 +115,8 @@ class SHAPExplainer:
         importance = dict(sorted(importance.items(), key=lambda x: x[1], reverse=True))
 
         return importance
+
+
+# For backward compatibility
+class ShapExplainer(SHAPExplainer):
+    pass
