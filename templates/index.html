@@ -142,7 +142,7 @@
             font-family: 'Courier New', monospace;
             font-size: 13px;
             line-height: 1.6;
-            max-height: 400px;
+            max-height: 500px;
             overflow-y: auto;
         }
         .explanation-tabs {
@@ -178,12 +178,14 @@
         }
         .factors {
             margin-top: 10px;
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
         }
+
+        /* Factor item with left section - UPDATED FOR ALL FACTORS */
         .factor {
             padding: 8px 12px;
-            margin: 5px 0;
+            margin: 4px 0;
             background: white;
             border-radius: 6px;
             border-left: 4px solid #3498db;
@@ -192,24 +194,85 @@
             justify-content: space-between;
             align-items: center;
             font-size: 13px;
+            gap: 8px;
         }
+
+        .factor-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .factor-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .factor-icon.positive {
+            background: #d1fae5;
+            color: #10b981;
+        }
+
+        .factor-icon.negative {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
+        .factor-bar {
+            flex: 1;
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 9999px;
+            margin: 0 8px;
+            max-width: 80px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .factor-bar .fill {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.6s ease;
+        }
+
+        .factor-bar .fill.positive {
+            background: #10b981;
+        }
+
+        .factor-bar .fill.negative {
+            background: #ef4444;
+        }
+
         .factor-name {
             font-weight: 600;
             color: #2c3e50;
+            white-space: nowrap;
         }
         .factor-value {
             color: #7f8c8d;
             font-size: 12px;
+            margin-left: 4px;
         }
         .factor-impact {
             font-weight: 600;
             font-size: 14px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
         .impact-positive {
-            color: #27ae60;
+            color: #10b981;
         }
         .impact-negative {
-            color: #e74c3c;
+            color: #ef4444;
         }
         .impact-neutral {
             color: #95a5a6;
@@ -274,6 +337,8 @@
             .help-text { margin-left: 0; }
             .explanation-tabs { flex-wrap: wrap; }
             .input-panel { max-width: 100%; }
+            .factor { flex-wrap: wrap; gap: 4px; }
+            .factor-bar { max-width: 60px; }
         }
     </style>
 </head>
@@ -285,7 +350,7 @@
         <div class="two-columns">
             <div class="input-panel">
                 <div id="inputForm">
-                    <div class="section-header">📦 Product</div>
+                    <div class="section-header"> Product</div>
                     <div class="input-group">
                         <label>Item ID:</label>
                         <select id="item_id" required>
@@ -306,7 +371,7 @@
                         </select>
                     </div>
 
-                    <div class="section-header">📊 Business Metrics</div>
+                    <div class="section-header"> Business Metrics</div>
                     <div class="input-group">
                         <label>Sales (units):</label>
                         <input type="number" id="sales" value="1000" step="100" min="0">
@@ -327,7 +392,7 @@
                         <input type="checkbox" id="has_promo">
                     </div>
 
-                    <div class="section-header">📈 Market Factors</div>
+                    <div class="section-header"> Market Factors</div>
                     <div class="input-group">
                         <label>Seasonality Index:</label>
                         <input type="number" id="seasonality_index" value="1.2" step="0.1" min="0.1">
@@ -365,14 +430,20 @@
                         <div class="price-change" id="price-change"></div>
                     </div>
 
-                    <div style="font-weight: 600; margin-bottom: 10px;">📝 Explanation</div>
+                    <!-- Confidence Section -->
+                    <div id="confidence-section" style="display:none; background:#f0f7ff; padding:15px; border-radius:8px; margin-bottom:15px;">
+                        <div style="font-weight:600; margin-bottom:8px;"> Confidence & Reliability</div>
+                        <div id="confidence-details" style="font-size:13px; color:#555;"></div>
+                    </div>
+
+                    <div style="font-weight: 600; margin-bottom: 10px;"> Explanation</div>
                     <div class="explanation-box" id="explanation"></div>
 
-                    <div style="font-weight: 600; margin-bottom: 10px;">📊 Key Factors</div>
+                    <div style="font-weight: 600; margin-bottom: 10px;"> Key Factors</div>
 
                     <div class="explanation-tabs">
-                        <button class="tab-btn active" data-tab="shap">🔵 SHAP</button>
-                        <button class="tab-btn" data-tab="lime">🔴 LIME</button>
+                        <button class="tab-btn active" data-tab="shap"> SHAP</button>
+                        <button class="tab-btn" data-tab="lime"> LIME</button>
                     </div>
 
                     <div id="shap-factors" class="factors-container active">
@@ -396,7 +467,7 @@
     </div>
 
     <script>
-        console.log("✅ Page loaded successfully");
+        console.log("Page loaded successfully");
 
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -414,13 +485,13 @@
         const predictBtn = document.getElementById('predictBtn');
 
         predictBtn.addEventListener('click', async function(e) {
-            console.log("🔘 Button clicked!");
+            console.log("Button clicked!");
 
             const itemId = document.getElementById('item_id').value;
             const storeId = document.getElementById('store_id').value;
 
-            console.log("📦 Item:", itemId);
-            console.log("🏪 Store:", storeId);
+            console.log("Item:", itemId);
+            console.log("Store:", storeId);
 
             if (!itemId || !storeId) {
                 showError('Please select both an Item and a Store.');
@@ -450,7 +521,7 @@
                 current_price: parseFloat(document.getElementById('current_price').value) || 7.00
             };
 
-            console.log("📤 Sending request:", data);
+            console.log("Sending request:", data);
 
             try {
                 const response = await fetch('/predict', {
@@ -462,16 +533,16 @@
                     body: JSON.stringify(data)
                 });
 
-                console.log("📥 Response status:", response.status);
+                console.log("Response status:", response.status);
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error("❌ Error response:", errorText);
+                    console.error("Error response:", errorText);
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
                 const result = await response.json();
-                console.log("📥 Response data:", result);
+                console.log("Response data:", result);
 
                 if (result.success) {
                     displayResult(result);
@@ -479,7 +550,7 @@
                     showError('Error: ' + (result.error || 'Unknown error occurred'));
                 }
             } catch (error) {
-                console.error('❌ Error:', error);
+                console.error('Error:', error);
                 showError('Error: ' + error.message);
             } finally {
                 loadingDiv.style.display = 'none';
@@ -490,7 +561,7 @@
 
         function showError(message) {
             const errorDiv = document.getElementById('error-message');
-            errorDiv.textContent = '❌ ' + message;
+            errorDiv.textContent = '' + message;
             errorDiv.style.display = 'block';
             document.getElementById('result').style.display = 'none';
         }
@@ -515,7 +586,7 @@
         }
 
         function displayResult(result) {
-            console.log("🎯 Displaying results");
+            console.log("Displaying results");
 
             try {
                 // Price
@@ -535,80 +606,177 @@
                     `${changeSign}${priceChangePct.toFixed(1)}% (${changeSign}$${priceChangeAbs.toFixed(2)})` +
                     `</span>`;
 
+                // ============================================================
+                // CONFIDENCE SECTION
+                // ============================================================
+                const confSection = document.getElementById('confidence-section');
+                const confDetails = document.getElementById('confidence-details');
+
+                if (result.confidence && result.confidence.level) {
+                    confSection.style.display = 'block';
+                    const level = result.confidence.level;
+                    const levelColor = level === 'High' ? '#28a745' : (level === 'Medium' ? '#ffc107' : '#dc3545');
+
+                    let html = `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:8px;">`;
+
+                    html += `<div><span style="color:#888;font-size:11px;">Confidence</span><br><b style="color:${levelColor};">${level}</b></div>`;
+
+                    if (result.confidence.reliability_score !== null) {
+                        html += `<div><span style="color:#888;font-size:11px;">Reliability</span><br><b>${(result.confidence.reliability_score * 100).toFixed(1)}%</b></div>`;
+                    }
+
+                    if (result.confidence.uncertainty_score !== null) {
+                        html += `<div><span style="color:#888;font-size:11px;">Uncertainty</span><br><b>${(result.confidence.uncertainty_score * 100).toFixed(1)}%</b></div>`;
+                    }
+
+                    if (result.confidence.prediction_interval_lower !== null) {
+                        html += `<div><span style="color:#888;font-size:11px;">Prediction Range</span><br><b>$${result.confidence.prediction_interval_lower.toFixed(2)} - $${result.confidence.prediction_interval_upper.toFixed(2)}</b></div>`;
+                    }
+
+                    if (result.confidence.ensemble_mean !== null) {
+                        html += `<div><span style="color:#888;font-size:11px;">Ensemble Mean</span><br><b>$${result.confidence.ensemble_mean.toFixed(2)}</b></div>`;
+                    }
+
+                    if (result.confidence.model_agreement !== null) {
+                        html += `<div><span style="color:#888;font-size:11px;">Model Agreement</span><br><b>${result.confidence.model_agreement.toFixed(1)}%</b></div>`;
+                    }
+
+                    html += `</div>`;
+                    confDetails.innerHTML = html;
+                } else {
+                    confSection.style.display = 'none';
+                }
+
                 // Explanation
                 document.getElementById('explanation').innerHTML = result.explanation || 'No explanation available';
 
-                // SHAP Factors
+                // ============================================================
+                // SHAP Factors - Show ALL factors with positive/negative colors
+                // ============================================================
                 const shapDiv = document.getElementById('shap-factors-list');
                 shapDiv.innerHTML = '';
                 const shapFactors = result.shap_factors || {};
                 let hasShap = false;
-                for (const [feature, details] of Object.entries(shapFactors)) {
-                    const shapValue = safeNumber(details.shap_value);
-                    if (safeAbs(shapValue) < 0.001) continue;
+
+                // Convert to array and sort by absolute impact
+                const shapArray = Object.entries(shapFactors).map(([name, details]) => ({
+                    name: name,
+                    details: details,
+                    shapValue: safeNumber(details.shap_value),
+                    absValue: Math.abs(safeNumber(details.shap_value))
+                }));
+
+                // Sort by absolute impact (highest first)
+                shapArray.sort((a, b) => b.absValue - a.absValue);
+
+                // Find max value for bar scaling
+                const maxShap = shapArray.length > 0 ? shapArray[0].absValue : 1;
+
+                for (const item of shapArray) {
+                    const shapValue = item.shapValue;
+                    if (Math.abs(shapValue) < 0.001) continue;
                     hasShap = true;
 
-                    const impact = details.impact || 'neutral';
-                    const cls = impact === 'positive' ? 'impact-positive' : (impact === 'negative' ? 'impact-negative' : 'impact-neutral');
-                    const sym = impact === 'positive' ? '+' : (impact === 'negative' ? '-' : '');
+                    const isPositive = shapValue > 0;
+                    const impact = isPositive ? 'positive' : 'negative';
+                    const cls = isPositive ? 'impact-positive' : 'impact-negative';
+                    const icon = isPositive ? '↑' : '↓';
+                    const sign = isPositive ? '+' : '';
+                    const details = item.details;
 
                     let val = details.value;
                     if (typeof val === 'string') { /* keep */ }
                     else if (typeof val === 'number') { val = val.toFixed(2); }
                     else { val = 'N/A'; }
 
+                    const barPct = Math.min((Math.abs(shapValue) / maxShap) * 100, 100);
+
                     shapDiv.innerHTML += `
                         <div class="factor">
-                            <div>
-                                <span class="factor-name">${feature}</span>
-                                <span class="factor-value"> (${val})</span>
+                            <div class="factor-left">
+                                <span class="factor-icon ${impact}">${icon}</span>
+                                <div>
+                                    <span class="factor-name">${item.name}</span>
+                                    <span class="factor-value">(${val})</span>
+                                </div>
+                            </div>
+                            <div class="factor-bar">
+                                <div class="fill ${impact}" style="width:${barPct}%;"></div>
                             </div>
                             <div class="factor-impact ${cls}">
-                                ${sym} $${safeAbs(shapValue).toFixed(2)}
+                                ${sign}$${Math.abs(shapValue).toFixed(2)}
                             </div>
                         </div>
                     `;
                 }
+
                 if (!hasShap) {
                     shapDiv.innerHTML = '<div style="color:#999; padding:10px;">No SHAP factors available</div>';
                 }
 
-                // LIME Factors
+                // ============================================================
+                // LIME Factors - Show ALL factors with positive/negative colors
+                // ============================================================
                 const limeDiv = document.getElementById('lime-factors-list');
                 limeDiv.innerHTML = '';
                 const limeFactors = result.lime_factors || {};
                 let hasLime = false;
-                for (const [feature, details] of Object.entries(limeFactors)) {
-                    const limeValue = safeNumber(details.abs_impact || details.value || 0);
-                    if (safeAbs(limeValue) < 0.001) continue;
+
+                const limeArray = Object.entries(limeFactors).map(([name, details]) => ({
+                    name: name,
+                    details: details,
+                    limeValue: safeNumber(details.lime_value || details.value || 0),
+                    absValue: Math.abs(safeNumber(details.lime_value || details.value || 0))
+                }));
+
+                limeArray.sort((a, b) => b.absValue - a.absValue);
+                const maxLime = limeArray.length > 0 ? limeArray[0].absValue : 1;
+
+                for (const item of limeArray) {
+                    const limeValue = item.limeValue;
+                    if (Math.abs(limeValue) < 0.001) continue;
                     hasLime = true;
 
-                    const impact = details.impact || 'neutral';
-                    const cls = impact === 'positive' ? 'impact-positive' : (impact === 'negative' ? 'impact-negative' : 'impact-neutral');
-                    const sym = impact === 'positive' ? '+' : (impact === 'negative' ? '-' : '');
+                    const isPositive = limeValue > 0;
+                    const impact = isPositive ? 'positive' : 'negative';
+                    const cls = isPositive ? 'impact-positive' : 'impact-negative';
+                    const icon = isPositive ? '↑' : '↓';
+                    const sign = isPositive ? '+' : '';
+                    const details = item.details;
 
                     let val = details.value;
                     if (typeof val === 'string') { /* keep */ }
                     else if (typeof val === 'number') { val = val.toFixed(2); }
                     else { val = 'N/A'; }
 
+                    const barPct = Math.min((Math.abs(limeValue) / maxLime) * 100, 100);
+
                     limeDiv.innerHTML += `
                         <div class="factor">
-                            <div>
-                                <span class="factor-name">${feature}</span>
-                                <span class="factor-value"> (${val})</span>
+                            <div class="factor-left">
+                                <span class="factor-icon ${impact}">${icon}</span>
+                                <div>
+                                    <span class="factor-name">${item.name}</span>
+                                    <span class="factor-value">(${val})</span>
+                                </div>
+                            </div>
+                            <div class="factor-bar">
+                                <div class="fill ${impact}" style="width:${barPct}%;"></div>
                             </div>
                             <div class="factor-impact ${cls}">
-                                ${sym} ${safeAbs(limeValue).toFixed(2)}
+                                ${sign}$${Math.abs(limeValue).toFixed(2)}
                             </div>
                         </div>
                     `;
                 }
+
                 if (!hasLime) {
                     limeDiv.innerHTML = '<div style="color:#999; padding:10px;">No LIME factors available</div>';
                 }
 
-                // Comparison
+                // ============================================================
+                // COMPARISON
+                // ============================================================
                 const compBox = document.getElementById('comparison-box');
                 if (result.comparison && result.comparison.agreement_score !== null) {
                     const agreement = safeNumber(result.comparison.agreement_score);
@@ -617,52 +785,54 @@
                     else if (agreement >= 40) { cls = 'agreement-medium'; text = 'Medium'; }
 
                     compBox.innerHTML = `
-                        <strong>🔍 SHAP vs LIME Agreement</strong><br>
+                        <strong> SHAP vs LIME Agreement</strong><br>
                         Agreement Score: <span class="${cls}">${agreement.toFixed(1)}%</span> (${text})<br>
                         Correlation: ${result.comparison.correlation || 'N/A'}<br>
-                        Consistent: ${result.comparison.consistent ? '✅ Yes' : '❌ No'}
+                        Consistent: ${result.comparison.consistent ? ' Yes' : ' No'}
                     `;
                     compBox.style.display = 'block';
                 } else {
                     compBox.style.display = 'none';
                 }
 
-                // Business Rules
+                // ============================================================
+                // BUSINESS RULES
+                // ============================================================
                 const rulesBox = document.getElementById('rules-box');
                 if (result.business_rules_applied && result.business_rules_applied.length > 0) {
-                    rulesBox.innerHTML = `<strong>📋 Business Rules Applied:</strong><br>${result.business_rules_applied.join('<br>')}`;
+                    rulesBox.innerHTML = `<strong> Business Rules Applied:</strong><br>${result.business_rules_applied.join('<br>')}`;
                     rulesBox.style.display = 'block';
                 } else {
                     rulesBox.style.display = 'none';
                 }
 
                 document.getElementById('result').style.display = 'block';
-                console.log("✅ Results displayed successfully");
+                console.log("Results displayed successfully");
             } catch (err) {
-                console.error("❌ Error displaying results:", err);
+                console.error("Error displaying results:", err);
                 showError("Error displaying results: " + err.message);
             }
         }
 
         // Auto-select first item and store
         document.addEventListener('DOMContentLoaded', function() {
-            console.log("🚀 DOM loaded, auto-selecting first options...");
+            console.log("DOM loaded, auto-selecting first options...");
 
             const itemSelect = document.getElementById('item_id');
             const storeSelect = document.getElementById('store_id');
 
             if (itemSelect.options.length > 1) {
                 itemSelect.selectedIndex = 1;
-                console.log("✅ Auto-selected item:", itemSelect.value);
+                console.log("Auto-selected item:", itemSelect.value);
             } else {
-                console.warn("⚠️ No items available in dropdown");
+                console.warn("No items available in dropdown");
             }
 
             if (storeSelect.options.length > 1) {
                 storeSelect.selectedIndex = 1;
-                console.log("✅ Auto-selected store:", storeSelect.value);
+                console.log("Auto-selected store:", storeSelect.value);
             } else {
-                console.warn("⚠️ No stores available in dropdown");
+                console.warn("No stores available in dropdown");
             }
         });
     </script>

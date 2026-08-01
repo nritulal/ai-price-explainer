@@ -23,6 +23,7 @@ from src.utils.constants import CONFIG, PROCESSED_DATA_PATH
 import numpy as np
 import json
 import pandas as pd
+import joblib
 
 
 def print_data_preview(df, title="Data Preview"):
@@ -228,12 +229,12 @@ def main():
         print(f"\n[Warnings]")
         print("-" * 40)
         for warning in reliability_factors['warnings']:
-            print(f"  ⚠ {warning}")
+            print(f"  WARNING: {warning}")
 
     print(f"\n[Recommendations]")
     print("-" * 40)
     for rec in reliability_factors['recommendations']:
-        print(f"  ✓ {rec}")
+        print(f"  RECOMMENDATION: {rec}")
 
     # Explanation agreement
     print(f"\n[Explanation Agreement]")
@@ -282,15 +283,29 @@ def main():
     print(f"  Total Validation Samples: {len(X_val):,}")
     print(f"  Total Test Samples: {len(X_test):,}")
     print(f"  Model RMSE: ${metrics['val_rmse']:.4f}")
-    print(f"  Model R² Score: {metrics['val_r2']:.4f}")
+    print(f"  Model R2 Score: {metrics['val_r2']:.4f}")
     print(f"  Training Time: {metrics['training_time_seconds']:.2f} seconds")
     print(f"  Prediction Reliability: {uncertainty_scores['reliability_score']:.1%}")
     print(f"  Confidence Level: {uncertainty_scores['confidence_level']}")
-    # After model.save_model() in run_experiments.py
 
-    # Save encoders for web app
-    import joblib
-    from src.utils.constants import PROCESSED_DATA_PATH
+    # ================================================================
+    # SAVE THE SCALER - THIS IS THE CRITICAL FIX
+    # ================================================================
+    print("\n" + "=" * 80)
+    print("SAVING ARTIFACTS FOR WEB APP")
+    print("=" * 80)
+
+    # Save scaler
+    try:
+        scaler = dataloader.scaler
+        if scaler is not None:
+            scaler_path = PROCESSED_DATA_PATH / 'scaler.pkl'
+            joblib.dump(scaler, scaler_path)
+            print(f"[OK] Scaler saved to {scaler_path}")
+        else:
+            print("[WARNING] Scaler is None, not saving")
+    except Exception as e:
+        print(f"[ERROR] Failed to save scaler: {e}")
 
     # Save encoders from FeatureEngineer
     if hasattr(dataloader.engineer, 'label_encoders'):
@@ -315,37 +330,47 @@ def main():
             with open(PROCESSED_DATA_PATH / 'store_mapping.json', 'w') as f:
                 json.dump(store_mapping, f, indent=2)
             print("[OK] Saved store mapping")
-        # Add this after model training and before the final print
 
-        # Save item and store mappings for the web app
-        print("\n[INFO] Saving item and store mappings for web app...")
+    # Save item and store mappings for the web app
+    print("\n[INFO] Saving item and store mappings for web app...")
 
-        # Get unique items and stores from training data
-        unique_items = train_df['item_id'].unique().tolist()
-        unique_stores = train_df['store_id'].unique().tolist()
+    # Get unique items and stores from training data
+    unique_items = train_df['item_id'].unique().tolist()
+    unique_stores = train_df['store_id'].unique().tolist()
 
-        # Create mappings
-        item_mapping = {i: item for i, item in enumerate(unique_items)}
-        store_mapping = {i: store for i, store in enumerate(unique_stores)}
+    # Create mappings
+    item_mapping = {i: item for i, item in enumerate(unique_items)}
+    store_mapping = {i: store for i, store in enumerate(unique_stores)}
 
-        # Save mappings
-        with open(PROCESSED_DATA_PATH / 'item_mapping.json', 'w') as f:
-            json.dump(item_mapping, f, indent=2)
+    # Save mappings
+    with open(PROCESSED_DATA_PATH / 'item_mapping.json', 'w') as f:
+        json.dump(item_mapping, f, indent=2)
 
-        with open(PROCESSED_DATA_PATH / 'store_mapping.json', 'w') as f:
-            json.dump(store_mapping, f, indent=2)
+    with open(PROCESSED_DATA_PATH / 'store_mapping.json', 'w') as f:
+        json.dump(store_mapping, f, indent=2)
 
-        # Save reverse mappings for lookup
-        reverse_item_mapping = {item: i for i, item in enumerate(unique_items)}
-        reverse_store_mapping = {store: i for i, store in enumerate(unique_stores)}
+    # Save reverse mappings for lookup
+    reverse_item_mapping = {item: i for i, item in enumerate(unique_items)}
+    reverse_store_mapping = {store: i for i, store in enumerate(unique_stores)}
 
-        with open(PROCESSED_DATA_PATH / 'reverse_item_mapping.json', 'w') as f:
-            json.dump(reverse_item_mapping, f, indent=2)
+    with open(PROCESSED_DATA_PATH / 'reverse_item_mapping.json', 'w') as f:
+        json.dump(reverse_item_mapping, f, indent=2)
 
-        with open(PROCESSED_DATA_PATH / 'reverse_store_mapping.json', 'w') as f:
-            json.dump(reverse_store_mapping, f, indent=2)
+    with open(PROCESSED_DATA_PATH / 'reverse_store_mapping.json', 'w') as f:
+        json.dump(reverse_store_mapping, f, indent=2)
 
-        print(f"[OK] Saved {len(unique_items)} items and {len(unique_stores)} stores for web app")
+    print(f"[OK] Saved {len(unique_items)} items and {len(unique_stores)} stores for web app")
+
+    # Save feature names
+    with open(PROCESSED_DATA_PATH / 'feature_names.json', 'w') as f:
+        json.dump(X_train.columns.tolist(), f, indent=2)
+    print("[OK] Saved feature names")
+
+    print("\n" + "=" * 80)
+    print("ALL ARTIFACTS SAVED SUCCESSFULLY")
+    print("=" * 80)
+    print("\nYou can now run: python app.py")
+
 
 if __name__ == "__main__":
     main()
