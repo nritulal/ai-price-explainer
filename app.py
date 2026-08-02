@@ -1,4 +1,4 @@
-"""Flask web application - WITH Confidence Module"""
+"""Flask web application - WITH Confidence Module and LLM Integration"""
 
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
@@ -20,6 +20,7 @@ from src.business.rules_engine import BusinessRulesEngine
 from src.evaluation.confidence import ConfidenceModule, UncertaintyEstimator
 from src.utils.constants import PROCESSED_DATA_PATH, EXPERIMENTS_PATH
 from src.llm.summarizer import LLMSummarizer
+
 app = Flask(__name__)
 
 # Global variables
@@ -124,7 +125,7 @@ def load_models():
     """Load all required models and components"""
     global model, feature_names, shap_explainer, lime_explainer, comparator
     global rules_engine, training_data_scaled, training_y, scaler
-    global confidence_module, uncertainty_estimator
+    global confidence_module, uncertainty_estimator, llm_summarizer
 
     print("\n" + "=" * 60)
     print("Loading AI-Powered Price Explanations System")
@@ -291,7 +292,8 @@ def load_models():
     except Exception as e:
         print(f"[WARNING] Could not initialize uncertainty estimator: {e}")
         uncertainty_estimator = None
-    global llm_summarizer
+
+    # Initialize LLM Summarizer
     try:
         # Try local LLM first (no API key needed!)
         llm_summarizer = LLMSummarizer(provider='local', max_ram='4gb')
@@ -301,9 +303,6 @@ def load_models():
         # Fallback to mock mode
         llm_summarizer = LLMSummarizer(provider='mock')
         print("[INFO] LLM summarizer using mock mode")
-
-    print("[OK] All components initialized successfully!")
-    return True
 
     print("[OK] All components initialized successfully!")
     return True
@@ -473,12 +472,12 @@ def predict():
 
         # Generate SHAP explanation using scaled features
         shap_exp = shap_explainer.explain_prediction(features_scaled, feature_names)
-        shap_features = dict(list(shap_exp['features'].items())[:10])  # Get top 10
+        shap_features = dict(list(shap_exp['features'].items())[:10])
         base_value = float(shap_exp['base_value'])
 
         # Generate LIME explanation
         lime_exp = lime_explainer.explain_prediction(features_scaled)
-        lime_features = dict(list(lime_exp['features'].items())[:10])  # Get top 10
+        lime_features = dict(list(lime_exp['features'].items())[:10])
 
         # Compare SHAP and LIME
         comparison_result = comparator.compare_explanations(features_scaled[0], feature_names)
@@ -577,34 +576,33 @@ def predict():
         positive_factors = [f for f in all_factors_with_impact if f['impact'] == 'positive']
         negative_factors = [f for f in all_factors_with_impact if f['impact'] == 'negative']
 
-        # Build the explanation parts
-        parts = []
+        # Build the factor contribution parts
+        factor_parts = []
 
         # Add positive factors
         if positive_factors:
-            parts.append("")
-            parts.append("FACTORS INCREASING THE PRICE (Positive Impact):")
-            parts.append("-" * 50)
+            factor_parts.append("FACTORS INCREASING THE PRICE (Positive Impact):")
+            factor_parts.append("-" * 50)
             for f in positive_factors[:8]:
                 shap_val = abs(f['shap_value'])
                 val = f['value']
                 if isinstance(val, str):
-                    parts.append(f"  ↑ {f['name']}: {val} (+${shap_val:.2f})")
+                    factor_parts.append(f"  ↑ {f['name']}: {val} (+${shap_val:.2f})")
                 else:
-                    parts.append(f"  ↑ {f['name']}: {val:.2f} (+${shap_val:.2f})")
+                    factor_parts.append(f"  ↑ {f['name']}: {val:.2f} (+${shap_val:.2f})")
 
         # Add negative factors
         if negative_factors:
-            parts.append("")
-            parts.append("FACTORS DECREASING THE PRICE (Negative Impact):")
-            parts.append("-" * 50)
+            factor_parts.append("")
+            factor_parts.append("FACTORS DECREASING THE PRICE (Negative Impact):")
+            factor_parts.append("-" * 50)
             for f in negative_factors[:8]:
                 shap_val = abs(f['shap_value'])
                 val = f['value']
                 if isinstance(val, str):
-                    parts.append(f"  ↓ {f['name']}: {val} (-${shap_val:.2f})")
+                    factor_parts.append(f"  ↓ {f['name']}: {val} (-${shap_val:.2f})")
                 else:
-                    parts.append(f"  ↓ {f['name']}: {val:.2f} (-${shap_val:.2f})")
+                    factor_parts.append(f"  ↓ {f['name']}: {val:.2f} (-${shap_val:.2f})")
 
         # Build confidence text
         price_change_pct = ((final_price - current_price) / current_price) * 100 if current_price > 0 else 0
@@ -628,39 +626,12 @@ Ensemble Mean: ${ensemble_uncertainty['mean_prediction']:.2f}
 Model Agreement: {ensemble_uncertainty['model_agreement']:.1%}
 """
 
-        # Build the final explanation text
-        explanation_text = f"""
-PRICE RECOMMENDATION: ${final_price:.2f}
-
-Item: {item_id} | Store: {store_id}
-Current Price: ${current_price:.2f} | Change: {price_change_pct:+.1f}%
-
-{confidence_text}
-
-Why this price?
-
-The recommended price is based on the following key factors:
-
-{chr(10).join(parts)}
-
-Business Insight:
-The base price would have been ${base_value:.2f}. The adjustments above reflect current market conditions, demand patterns, and competitive landscape.
-
-Recommendation:
-This price aligns with market dynamics and maximizes expected revenue.
-
-Actionable Next Steps:
-- Monitor competitor prices for elastic items
-- Consider promotional bundling if inventory is high
-- Review pricing strategy for items with high seasonality
-        """
         # ================================================================
-        # GENERATE LLM EXPLANATION (Optional - falls back to mock)
+        # GENERATE LLM EXPLANATION (Optional - adds to existing explanation)
         # ================================================================
         llm_explanation = None
         if llm_summarizer is not None:
             try:
-                # Prepare business context with correct price
                 business_context = {
                     'item_id': item_id,
                     'store_id': store_id,
@@ -685,27 +656,50 @@ Actionable Next Steps:
                 print(f"[WARNING] LLM explanation failed: {e}")
                 llm_explanation = None
 
-        # If LLM generated an explanation, use it (keep the price and confidence from mock)
+        # ================================================================
+        # BUILD FINAL EXPLANATION - KEEP FACTOR CONTRIBUTIONS + ADD LLM
+        # ================================================================
+
+        # 1. Build the factor contribution section
+        factor_section = f"""
+KEY FACTORS DRIVING THIS PRICE:
+
+{chr(10).join(factor_parts)}
+
+Business Insight:
+The base price would have been ${base_value:.2f}. The adjustments above reflect current market conditions, demand patterns, and competitive landscape.
+
+Recommendation:
+This price aligns with market dynamics and maximizes expected revenue.
+
+Actionable Next Steps:
+- Monitor competitor prices for elastic items
+- Consider promotional bundling if inventory is high
+- Review pricing strategy for items with high seasonality
+"""
+
+        # 2. If LLM explanation exists, add it as a separate section ABOVE factors
+        llm_section = ""
         if llm_explanation:
-            # Keep the price, item info, and confidence from the mock explanation
-            # Replace just the "Why this price?" section
-            explanation_text = f"""
-        PRICE RECOMMENDATION: ${final_price:.2f}
+            llm_section = f"""
+AI-GENERATED SUMMARY:
+{llm_explanation}
 
-        Item: {item_id} | Store: {store_id}
-        Current Price: ${current_price:.2f} | Change: {price_change_pct:+.1f}%
+"""
 
-        {confidence_text}
+        # 3. Build final explanation: LLM summary (if available) + Factor breakdown
+        explanation_text = f"""
+PRICE RECOMMENDATION: ${final_price:.2f}
 
-        Why this price?
+Item: {item_id} | Store: {store_id}
+Current Price: ${current_price:.2f} | Change: {price_change_pct:+.1f}%
 
-        {llm_explanation}
+{confidence_text}
 
-        Actionable Next Steps:
-        - Monitor competitor prices for elastic items
-        - Consider promotional bundling if inventory is high
-        - Review pricing strategy for items with high seasonality
-                    """.strip()
+{llm_section}
+{factor_section}
+""".strip()
+
         # Build LIME display features
         lime_display_features = {}
         for feat, details in lime_features.items():
@@ -772,7 +766,8 @@ def health():
         'stores_available': len(available_stores),
         'confidence_loaded': confidence_module is not None,
         'scaler_loaded': scaler is not None,
-        'training_data_loaded': training_data_scaled is not None
+        'training_data_loaded': training_data_scaled is not None,
+        'llm_loaded': llm_summarizer is not None
     })
 
 
@@ -791,6 +786,7 @@ if __name__ == '__main__':
         print(f"Training Data: {'Loaded' if training_data_scaled is not None else 'NOT LOADED!'}")
         print(f"Confidence Module: {'Loaded' if confidence_module else 'Not loaded'}")
         print(f"Uncertainty Estimator: {'Loaded' if uncertainty_estimator else 'Not loaded'}")
+        print(f"LLM Summarizer: {'Loaded' if llm_summarizer else 'Not loaded'}")
         print(f"Open: http://localhost:5000")
         print("=" * 60 + "\n")
         app.run(debug=True, port=5000, threaded=True)
