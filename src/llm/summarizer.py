@@ -1,59 +1,123 @@
-"""LLM-based explanation summarization"""
+"""LLM-based explanation summarization - Supports Local LLM and Mock"""
 
 import json
-from typing import Dict
-import os
+from typing import Dict, Optional
 import numpy as np
+
+# Try to import languagemodels
+try:
+    import languagemodels as lm
+
+    LM_AVAILABLE = True
+except ImportError:
+    LM_AVAILABLE = False
+    print("[WARNING] languagemodels not installed. Run: pip install languagemodels")
 
 
 class LLMSummarizer:
-    def __init__(self, provider='mock', api_key=None):
+    def __init__(self, provider='mock', max_ram="4gb"):
+        """
+        Initialize LLM summarizer.
+
+        Args:
+            provider: 'local' or 'mock'
+            max_ram: Max RAM for local model (e.g., "4gb", "8gb")
+        """
         self.provider = provider
 
-        if provider == 'openai' and api_key:
+        if provider == 'local' and LM_AVAILABLE:
             try:
-                import openai
-                openai.api_key = api_key
-                self.client = openai
-            except ImportError:
-                print("OpenAI not installed. Using mock mode.")
+                lm.config["max_ram"] = max_ram
+                print(f"[OK] Local LLM initialized with {max_ram} RAM")
+                # Test the model
+                test_response = lm.do("Hello")
+                print(f"[OK] Local LLM test successful")
+                self.client = lm
+            except Exception as e:
+                print(f"[WARNING] Local LLM init failed: {e}")
                 self.provider = 'mock'
+                self.client = None
+        else:
+            self.provider = 'mock'
+            self.client = None
+            print("[INFO] Using mock LLM mode (no API calls)")
 
-    def generate_explanation(self, shap_explanation: Dict, lime_explanation: Dict = None,
-                             business_context: Dict = None) -> str:
-        """Generate human-readable explanation"""
+    def generate_explanation(
+            self,
+            shap_explanation: Dict,
+            lime_explanation: Dict = None,
+            business_context: Dict = None
+    ) -> str:
+        """Generate human-readable explanation."""
 
         if self.provider == 'mock':
             return self._mock_explanation(shap_explanation, business_context)
+        elif self.provider == 'local' and self.client is not None:
+            return self._local_explanation(shap_explanation, business_context)
         else:
-            return self._llm_explanation(shap_explanation, lime_explanation, business_context)
+            return self._mock_explanation(shap_explanation, business_context)
+
+    def _local_explanation(self, shap_explanation: Dict, business_context: Dict = None) -> str:
+        """Generate explanation using local LLM."""
+        try:
+            # Get prediction and features
+            prediction = shap_explanation.get('prediction', 0)
+            base_value = shap_explanation.get('base_value', 0)
+            features = shap_explanation.get('features', {})
+            top_features = list(features.items())[:5]
+
+            # Build prompt
+            feature_lines = []
+            for feature, details in top_features:
+                shap_val = details.get('shap_value', 0)
+                impact = "increases" if shap_val > 0 else "decreases"
+                val = details.get('value', 'N/A')
+                if isinstance(val, float):
+                    val = f"{val:.2f}"
+                feature_lines.append(f"  - {feature}: {val} ({impact} price by ${abs(shap_val):.2f})")
+
+            features_text = "\n".join(feature_lines) if feature_lines else "No key factors identified."
+
+            prompt = f"""You are a pricing expert. Explain why an AI recommended a price.
+
+RECOMMENDED PRICE: ${prediction:.2f}
+BASE PRICE: ${base_value:.2f}
+
+KEY FACTORS:
+{features_text}
+
+Provide a short, business-friendly explanation (max 100 words). Use simple language. No jargon.
+
+EXPLANATION:"""
+
+            response = self.client.do(prompt)
+            return response.strip()
+
+        except Exception as e:
+            print(f"[WARNING] Local LLM failed: {e}")
+            return self._mock_explanation(shap_explanation, business_context)
 
     def _mock_explanation(self, shap_explanation: Dict, business_context: Dict = None) -> str:
-        """Mock LLM explanation for testing"""
+        """Mock LLM explanation for testing."""
+        prediction = shap_explanation.get('prediction', 0)
+        base_value = shap_explanation.get('base_value', 0)
 
-        prediction = shap_explanation['prediction']
-        base_value = shap_explanation['base_value']
+        features = shap_explanation.get('features', {})
+        top_features = list(features.items())[:4]
 
-        # Get top 3 features
-        top_features = list(shap_explanation['features'].items())[:3]
-
-        explanation_parts = []
-
+        parts = []
         for feature, details in top_features:
-            impact_symbol = "+" if details['impact'] == 'positive' else "-"
-            explanation_parts.append(
-                f"  * {impact_symbol} {feature}: {details['value']:.2f} "
-                f"({impact_symbol} price by ${abs(details['shap_value']):.2f})"
-            )
+            impact_symbol = "+" if details.get('impact') == 'positive' else "-"
+            shap_val = abs(details.get('shap_value', 0))
+            val = details.get('value', 'N/A')
+            if isinstance(val, float):
+                val = f"{val:.2f}"
+            parts.append(f"  * {impact_symbol} {feature}: {val} ({impact_symbol} price by ${shap_val:.2f})")
 
         explanation = f"""
-PRICE RECOMMENDATION: ${prediction:.2f}
-
-Why this price?
-
 The recommended price is based on the following key factors:
 
-{chr(10).join(explanation_parts)}
+{chr(10).join(parts)}
 
 Business Insight:
 The base price would have been ${base_value:.2f}. The adjustments above reflect current market conditions, demand patterns, and competitive landscape.
@@ -66,85 +130,4 @@ Actionable Next Steps:
 - Consider promotional bundling if inventory is high
 - Review pricing strategy for items with high seasonality
         """
-
         return explanation.strip()
-
-    def _llm_explanation(self, shap_explanation: Dict, lime_explanation: Dict,
-                         business_context: Dict = None) -> str:
-        """Generate explanation using actual LLM"""
-
-        # Get top features
-        top_features = list(shap_explanation['features'].items())[:5]
-
-        prompt = f"""
-You are a pricing expert at a major retail company. Explain why the AI model recommended a specific price.
-
-Recommended Price: ${shap_explanation['prediction']:.2f}
-Base Price: ${shap_explanation['base_value']:.2f}
-
-Key factors influencing this price:
-{json.dumps(dict(top_features), indent=2)}
-
-Business Context:
-{json.dumps(business_context, indent=2) if business_context else 'Not provided'}
-
-Please provide a clear, business-friendly explanation (max 150 words) that helps a retail manager understand:
-1. Why this price was recommended
-2. Which factors had the biggest impact
-3. A simple action item or insight
-
-Keep it professional but accessible. Avoid technical jargon like "SHAP values" or "elasticity coefficients" - instead say things like "price sensitivity" or "demand patterns".
-        """
-
-        try:
-            if hasattr(self, 'client'):
-                response = self.client.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.3,
-                    max_tokens=300
-                )
-                return response.choices[0].message.content
-            else:
-                return self._mock_explanation(shap_explanation, business_context)
-        except Exception as e:
-            print(f"LLM error: {e}")
-            return self._mock_explanation(shap_explanation, business_context)
-
-    def generate_business_summary(self, explanations: list) -> str:
-        """Generate summary for multiple predictions"""
-
-        if not explanations:
-            return "No explanations provided."
-
-        avg_price = np.mean([e['prediction'] for e in explanations])
-
-        # Collect common factors
-        all_factors = []
-        for exp in explanations[:10]:  # Limit to first 10
-            all_factors.extend(list(exp['features'].keys())[:2])
-
-        from collections import Counter
-        common_factors = Counter(all_factors).most_common(3)
-
-        summary = f"""
-PRICING SUMMARY REPORT
-
-Total Items Analyzed: {len(explanations)}
-Average Recommended Price: ${avg_price:.2f}
-
-Key Drivers Across All Items:
-{chr(10).join([f"  * {factor} (appeared in {count} cases)" for factor, count in common_factors])}
-
-Actionable Insights:
-1. Inventory Management: Consider bundling products with high price sensitivity
-2. Competitive Strategy: Monitor competitor prices for elastic items  
-3. Seasonal Planning: Adjust inventory based on seasonality signals
-
-Recommendations:
-- Review top 20% most price-sensitive items weekly
-- Implement A/B testing for items with high elasticity
-- Update competitor price monitoring frequency
-        """
-
-        return summary.strip()

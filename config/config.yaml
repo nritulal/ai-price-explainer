@@ -54,8 +54,8 @@ explainability:
   lime_num_features: 8
 
 llm:
-  provider: "openai"  # or "mock" for testing without API key
-  model: "gpt-3.5-turbo"
+  provider: "mock"
+  model: "mock"
   max_tokens: 300
   temperature: 0.3
 

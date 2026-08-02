@@ -19,7 +19,7 @@ from src.explainability.comparator import ExplanationComparator
 from src.business.rules_engine import BusinessRulesEngine
 from src.evaluation.confidence import ConfidenceModule, UncertaintyEstimator
 from src.utils.constants import PROCESSED_DATA_PATH, EXPERIMENTS_PATH
-
+from src.llm.summarizer import LLMSummarizer
 app = Flask(__name__)
 
 # Global variables
@@ -34,6 +34,7 @@ training_y = None
 scaler = None
 confidence_module = None
 uncertainty_estimator = None
+llm_summarizer = None
 
 # Item and Store mappings
 item_mapping = {}
@@ -290,6 +291,19 @@ def load_models():
     except Exception as e:
         print(f"[WARNING] Could not initialize uncertainty estimator: {e}")
         uncertainty_estimator = None
+    global llm_summarizer
+    try:
+        # Try local LLM first (no API key needed!)
+        llm_summarizer = LLMSummarizer(provider='local', max_ram='4gb')
+        print("[OK] LLM summarizer initialized with Local LLM")
+    except Exception as e:
+        print(f"[WARNING] Could not initialize local LLM: {e}")
+        # Fallback to mock mode
+        llm_summarizer = LLMSummarizer(provider='mock')
+        print("[INFO] LLM summarizer using mock mode")
+
+    print("[OK] All components initialized successfully!")
+    return True
 
     print("[OK] All components initialized successfully!")
     return True
@@ -640,7 +654,58 @@ Actionable Next Steps:
 - Consider promotional bundling if inventory is high
 - Review pricing strategy for items with high seasonality
         """
+        # ================================================================
+        # GENERATE LLM EXPLANATION (Optional - falls back to mock)
+        # ================================================================
+        llm_explanation = None
+        if llm_summarizer is not None:
+            try:
+                # Prepare business context with correct price
+                business_context = {
+                    'item_id': item_id,
+                    'store_id': store_id,
+                    'sales': sales,
+                    'inventory': inventory,
+                    'has_promo': has_promo,
+                    'seasonality': seasonality,
+                    'elasticity': elasticity,
+                    'competitor_price': competitor_price,
+                    'current_price': current_price,
+                    'recommended_price': final_price,
+                    'base_price': base_value
+                }
 
+                llm_explanation = llm_summarizer.generate_explanation(
+                    shap_explanation=shap_exp,
+                    lime_explanation=lime_exp,
+                    business_context=business_context
+                )
+                print(f"[DEBUG] LLM explanation generated")
+            except Exception as e:
+                print(f"[WARNING] LLM explanation failed: {e}")
+                llm_explanation = None
+
+        # If LLM generated an explanation, use it (keep the price and confidence from mock)
+        if llm_explanation:
+            # Keep the price, item info, and confidence from the mock explanation
+            # Replace just the "Why this price?" section
+            explanation_text = f"""
+        PRICE RECOMMENDATION: ${final_price:.2f}
+
+        Item: {item_id} | Store: {store_id}
+        Current Price: ${current_price:.2f} | Change: {price_change_pct:+.1f}%
+
+        {confidence_text}
+
+        Why this price?
+
+        {llm_explanation}
+
+        Actionable Next Steps:
+        - Monitor competitor prices for elastic items
+        - Consider promotional bundling if inventory is high
+        - Review pricing strategy for items with high seasonality
+                    """.strip()
         # Build LIME display features
         lime_display_features = {}
         for feat, details in lime_features.items():
